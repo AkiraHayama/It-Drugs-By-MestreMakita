@@ -236,6 +236,16 @@ Config.DryingRacks = {
         duration = 10, -- minutos até a secagem terminar
         dries = { -- item cru (colhido da planta) -> item seco (o que você recolhe depois), 1 pra 1
             ['weed_lemonhaze'] = 'weed_lemonhaze_dried',
+            -- 7 variedades novas (nextgen_weedprops) - antes só liberavam pra vender cru, agora
+            -- também dá pra secar igual a lemonhaze (o processamento em receita ainda é só pra
+            -- lemonhaze por enquanto, ver Config.ProcessingTables).
+            ['weed_ogkush'] = 'weed_ogkush_dried',
+            ['weed_nlights'] = 'weed_nlights_dried',
+            ['weed_dosidos'] = 'weed_dosidos_dried',
+            ['weed_acapulcogold'] = 'weed_acapulcogold_dried',
+            ['weed_colombiangold'] = 'weed_colombiangold_dried',
+            ['weed_limegreenskunk'] = 'weed_limegreenskunk_dried',
+            ['weed_rainbowbelts'] = 'weed_rainbowbelts_dried',
         },
     },
 }
@@ -633,21 +643,6 @@ Config.ProcessingTables = { -- Create processing table
                     anim = 'fixing_a_ped',
                 }
             },
-            ['prensado'] = {
-                label = 'Maconha Prensada',
-                ingrediants = { -- usa erva SECA igual o joint (tijolo prensado é feito com material curado, não fresco)
-                    ['weed_lemonhaze_dried'] = 8,
-                },
-                outputs = {
-                    ['prensado'] = 1
-                },
-                processTime = 10,
-                failChance = 15,
-                animation = {
-                    dict = 'mini@repair',
-                    anim = 'fixing_a_ped',
-                }
-            },
             -- Add more recipes here like this
             --[[ ['weedbag'] = {
                 label = 'Weed Bag',
@@ -663,7 +658,86 @@ Config.ProcessingTables = { -- Create processing table
             } ]]
         }
     },
-    
+
+    -- Prensa: mesa dedicada só pra transformar QUALQUER uma das 8 variedades de maconha (já
+    -- secas no secador) no "Tijolo" daquela variedade específica - uma receita por variedade,
+    -- cada uma dando um item FINAL DIFERENTE (tijolo_<variedade>, não um "prensado" genérico
+    -- único). Reaproveita a prop da mesa de cocaína (bkr_prop_coke_press_01b, confirmada válida
+    -- nesse servidor - usada em mri_Qadmin/data/object.lua).
+    -- PENDENTE: usuário vai adicionar uma etapa de "moedor" antes da prensa (moer a planta
+    -- inteira + outros ingredientes ainda não definidos) - por enquanto a Prensa aceita direto a
+    -- erva seca, igual já funcionava. Ajustar quando o moedor for definido.
+    ['prensa'] = {
+        type = 'weed',
+        model = 'bkr_prop_coke_press_01b',
+        recipes = {
+            ['tijolo_lemonhaze'] = {
+                label = 'Tijolo de Lemon Haze',
+                ingrediants = { ['weed_lemonhaze_dried'] = 8 },
+                outputs = { ['tijolo_lemonhaze'] = 1 },
+                processTime = 10,
+                failChance = 15,
+                animation = { dict = 'mini@repair', anim = 'fixing_a_ped' }
+            },
+            ['tijolo_ogkush'] = {
+                label = 'Tijolo de OG Kush',
+                ingrediants = { ['weed_ogkush_dried'] = 8 },
+                outputs = { ['tijolo_ogkush'] = 1 },
+                processTime = 10,
+                failChance = 15,
+                animation = { dict = 'mini@repair', anim = 'fixing_a_ped' }
+            },
+            ['tijolo_nlights'] = {
+                label = 'Tijolo de Northern Lights',
+                ingrediants = { ['weed_nlights_dried'] = 8 },
+                outputs = { ['tijolo_nlights'] = 1 },
+                processTime = 10,
+                failChance = 15,
+                animation = { dict = 'mini@repair', anim = 'fixing_a_ped' }
+            },
+            ['tijolo_dosidos'] = {
+                label = 'Tijolo de Do-Si-Dos',
+                ingrediants = { ['weed_dosidos_dried'] = 8 },
+                outputs = { ['tijolo_dosidos'] = 1 },
+                processTime = 10,
+                failChance = 15,
+                animation = { dict = 'mini@repair', anim = 'fixing_a_ped' }
+            },
+            ['tijolo_acapulcogold'] = {
+                label = 'Tijolo de Acapulco Gold',
+                ingrediants = { ['weed_acapulcogold_dried'] = 8 },
+                outputs = { ['tijolo_acapulcogold'] = 1 },
+                processTime = 10,
+                failChance = 15,
+                animation = { dict = 'mini@repair', anim = 'fixing_a_ped' }
+            },
+            ['tijolo_colombiangold'] = {
+                label = 'Tijolo de Colombian Gold',
+                ingrediants = { ['weed_colombiangold_dried'] = 8 },
+                outputs = { ['tijolo_colombiangold'] = 1 },
+                processTime = 10,
+                failChance = 15,
+                animation = { dict = 'mini@repair', anim = 'fixing_a_ped' }
+            },
+            ['tijolo_limegreenskunk'] = {
+                label = 'Tijolo de Lime Green Skunk',
+                ingrediants = { ['weed_limegreenskunk_dried'] = 8 },
+                outputs = { ['tijolo_limegreenskunk'] = 1 },
+                processTime = 10,
+                failChance = 15,
+                animation = { dict = 'mini@repair', anim = 'fixing_a_ped' }
+            },
+            ['tijolo_rainbowbelts'] = {
+                label = 'Tijolo de Rainbow Belts',
+                ingrediants = { ['weed_rainbowbelts_dried'] = 8 },
+                outputs = { ['tijolo_rainbowbelts'] = 1 },
+                processTime = 10,
+                failChance = 15,
+                animation = { dict = 'mini@repair', anim = 'fixing_a_ped' }
+            },
+        }
+    },
+
     ['cocaine_processing_table'] = {
         type = 'cocaine',
         model = 'bkr_prop_coke_table01a', -- Exanples: bkr_prop_weed_table_01a, bkr_prop_meth_table01a, bkr_prop_coke_table01a
