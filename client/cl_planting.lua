@@ -582,7 +582,7 @@ local giveWater = function(args)
     RequestNamedPtfxAsset('core')
     while not HasModelLoaded(model) or not HasNamedPtfxAssetLoaded('core') do Wait(0) end
     SetPtfxAssetNextCall('core')
-    local created_object = CreateObject(model, coords.x, coords.y, coords.z, true, true, true)
+    local created_object = CreateObject(model, coords.x, coords.y, coords.z, false, false, false)
     AttachEntityToEntity(created_object, ped, GetPedBoneIndex(ped, 28422), 0.4, 0.1, 0.0, 90.0, 180.0, 0.0, true, true, false, true, 1, true)
     local effect = StartParticleFxLoopedOnEntity('ent_sht_water', created_object, 0.35, 0.0, 0.25, 0.0, 0.0, 0.0, 2.0, false, false, false)
 
@@ -603,13 +603,13 @@ local giveWater = function(args)
     }) then
         TriggerServerEvent('it-drugs:server:plantTakeCare', entity, item)
         ClearPedTasks(ped)
-        DeleteEntity(created_object)
         StopParticleFxLooped(effect, 0)
+        if DoesEntityExist(created_object) then DeleteEntity(created_object) end
     else
         ShowNotification(nil, _U('NOTIFICATION__CANCELED'), "error")
         ClearPedTasks(ped)
-        DeleteEntity(created_object)
         StopParticleFxLooped(effect, 0)
+        if DoesEntityExist(created_object) then DeleteEntity(created_object) end
     end
 end
 
@@ -625,9 +625,9 @@ local giveFertilizer = function(args)
     Wait(200)
     RequestModel(model)
     while not HasModelLoaded(model) do Wait(0) end
-    local created_object = CreateObject(model, coords.x, coords.y, coords.z, true, true, true)
+    local created_object = CreateObject(model, coords.x, coords.y, coords.z, false, false, false)
     AttachEntityToEntity(created_object, ped, GetPedBoneIndex(ped, 28422), 0.3, 0.1, 0.0, 90.0, 180.0, 0.0, true, true, false, true, 1, true)
-    
+
     if lib.progressBar({
         duration = Config.Plants[type].time,
         label = _U('PROGRESSBAR__FERTILIZE__PLANT'),
@@ -645,11 +645,11 @@ local giveFertilizer = function(args)
     }) then
         TriggerServerEvent('it-drugs:server:plantTakeCare', entity, item)
         ClearPedTasks(ped)
-        DeleteEntity(created_object)
+        if DoesEntityExist(created_object) then DeleteEntity(created_object) end
     else
         ShowNotification(nil, _U('NOTIFICATION__CANCELED'), "error")
         ClearPedTasks(ped)
-        DeleteEntity(created_object)
+        if DoesEntityExist(created_object) then DeleteEntity(created_object) end
     end
 end
 
