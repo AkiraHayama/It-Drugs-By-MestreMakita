@@ -37,6 +37,21 @@ RegisterNetEvent('it-drugs:client:showPotMenu', function(potData)
             event = "it-drugs:client:addSoil",
             args = { entity = potData.entity, soilItem = soilItem }
         })
+    elseif potData.burnt then -- planta queimada: terra imprópria, só dá pra remover
+        table.insert(options, {
+            title = _U('MENU__POT__SOIL__BURNT'),
+            description = _U('MENU__POT__SOIL__BURNT__DESC'),
+            icon = "fire",
+        })
+    elseif potData.needsFertilizer then -- planta cortada: adubar antes de plantar de novo
+        table.insert(options, {
+            title = _U('MENU__POT__FERTILIZE'),
+            description = _U('MENU__POT__FERTILIZE__DESC'),
+            icon = "flask",
+            arrow = true,
+            event = "it-drugs:client:fertilizeSoil",
+            args = { entity = potData.entity }
+        })
     else
         local seedOptions = {}
 
@@ -77,6 +92,17 @@ RegisterNetEvent('it-drugs:client:showPotMenu', function(potData)
         end
     end
 
+    if potData.hasSoil then -- tirar a terra (queimada ou não): precisa pra pôr terra nova ou recolher o vaso
+        table.insert(options, {
+            title = _U('MENU__POT__REMOVE_SOIL'),
+            description = _U('MENU__POT__REMOVE_SOIL__DESC'),
+            icon = "trash",
+            arrow = true,
+            event = "it-drugs:client:removeSoil",
+            args = { entity = potData.entity }
+        })
+    end
+
     table.insert(options, {
         title = _U('MENU__POT__MOVE'),
         description = _U('MENU__POT__MOVE__DESC'),
@@ -115,19 +141,19 @@ RegisterNetEvent('it-drugs:client:showDryingRackMenu', function(rackData)
     if rackData.dryingItem then
         if rackData.ready then
             table.insert(options, {
-                title = _U('MENU__DRYINGRACK__READY'),
+                title = _U(rackData.curing and 'MENU__DRYINGRACK__READY__CURED' or 'MENU__DRYINGRACK__READY'),
                 description = _U('MENU__DRYINGRACK__READY__DESC'),
                 icon = "leaf",
                 arrow = true,
                 event = "it-drugs:client:collectDrying",
-                args = { entity = rackData.entity }
+                args = { entity = rackData.entity, item = rackData.item, coords = rackData.coords }
             })
         else
             local minutesLeft = math.ceil(rackData.remaining / 60)
             table.insert(options, {
-                title = _U('MENU__DRYINGRACK__DRYING'),
+                title = _U(rackData.slow and 'MENU__DRYINGRACK__CURING__SLOW' or rackData.curing and 'MENU__DRYINGRACK__CURING' or 'MENU__DRYINGRACK__DRYING'),
                 description = _U('MENU__DRYINGRACK__DRYING__DESC'):format(minutesLeft),
-                icon = "clock",
+                icon = rackData.curing and "fan" or "clock",
             })
         end
     else
@@ -140,7 +166,7 @@ RegisterNetEvent('it-drugs:client:showDryingRackMenu', function(rackData)
                     icon = "leaf",
                     arrow = true,
                     event = "it-drugs:client:startDrying",
-                    args = { entity = rackData.entity, item = rackData.item, rawItem = rawItem }
+                    args = { entity = rackData.entity, item = rackData.item, rawItem = rawItem, coords = rackData.coords }
                 })
             end
         end
@@ -203,7 +229,7 @@ local function getLightOptions(plantData)
     local totalLight = math.min((plantData.sunlight or 0) + (plantData.addedLight or 0), 100)
     local isOutdoor = (plantData.sunlight or 0) >= Config.IndoorSunlightThreshold
 
-    return {
+    local options = {
         {
             title = _U('MENU__PLANT__LIGHT'),
             description = math.floor(totalLight).. '%',
@@ -220,6 +246,18 @@ local function getLightOptions(plantData)
             icon = isOutdoor and "sun" or "house",
         }
     }
+
+    -- Pureza da maconha (Config.Purity) vai junto, já que essas opções aparecem nos 3 estados do menu
+    if plantData.purity and it.usesPurity(plantData.type) then
+        options[#options + 1] = {
+            title = _U('MENU__PLANT__PURITY'),
+            description = math.floor(plantData.purity) .. '%',
+            icon = "dna",
+            progress = math.floor(plantData.purity),
+            colorScheme = "violet"
+        }
+    end
+    return options
 end
 
 RegisterNetEvent("it-drugs:client:showPlantMenu", function(plantData)
@@ -386,7 +424,7 @@ RegisterNetEvent("it-drugs:client:showPlantMenu", function(plantData)
                 description = _U('MENU__PLANT__HARVEST__DESC'),
                 arrow = true,
                 event = "it-drugs:client:harvestPlant",
-                args = {id = plantData.id, type = plantData.type, fertilizer = plantData.fertilizer, coords = plantData.coords}
+                args = {id = plantData.id, type = plantData.type, fertilizer = plantData.fertilizer, coords = plantData.coords, purity = plantData.purity}
             })
         end
 

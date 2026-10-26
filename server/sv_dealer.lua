@@ -62,7 +62,8 @@ CreateThread(function()
             shopInventory[#shopInventory + 1] = {
                 name = item,
                 price = dealers[dealerId]:getItemData(item).price,
-                currency = 'money' -- ox_inventory item that represents cash in hand
+                currency = 'money', -- ox_inventory item that represents cash in hand
+                metadata = it.usesPurity(item) and { purity = Config.Purity.default } or nil -- semente de maconha sai com a pureza inicial (Config.Purity)
             }
         end
 

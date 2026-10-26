@@ -58,6 +58,11 @@ Config.DrugDealers = {
 
 --- Growing Related Settings
 Config.rayCastingDistance = 7.0 -- distance in meters
+-- Distância máxima (m) do boneco até onde dá pra colocar semente, vaso, lâmpada, rede, mesa e ventilador:
+-- mirando mais longe, o fantasma fica preso na borda. O servidor recusa além disso (+ 2 m de folga).
+Config.PlaceMaxDistance = 3.0
+-- Ferramenta pra plantar direto no CHÃO (cavucar); no vaso não precisa. Não é gasta. false = não exige.
+Config.PlantTool = 'pa_jardim'
 Config.FireTime = 10000 -- in ms
 Config.ClearOnStartup = true -- Clear dead plants on script start-up
 Config.PlayerPlantLimit = 10 -- Max amount of plants a player can have simultaneously
@@ -207,6 +212,7 @@ Config.Pots = {
         model = 'bzzz_growing_freepot_a', -- vaso VAZIO (pacote de asset MakitaPot, dependency nova, ver fxmanifest.lua), usado enquanto hasSoil = false. Preview confirmado por imagem (data/bzzz_growing_freepot_a.png).
         soilModel = 'bzzz_growing_freepot_c', -- vaso COM TERRA, troca pra esse model assim que o jogador usa "Colocar Terra" (server/sv_pots.lua troca o prop de verdade, apaga o vazio e cria esse no lugar). Preview: data/bzzz_growing_freepot_c.png. Pacote também tem "_b" (com pedrinha) e "_d" (com terra+plantado) se quiser trocar.
         soilItem = 'terra',
+        fertilizeItem = 'fertilizer', -- planta CORTADA deixa a terra precisando adubar: gasta 1 disso pra plantar de novo (queimar perde a terra toda)
         heightOffset = 0.0, -- altura (metros) do VASO em si em relação ao chão; número negativo afunda, positivo levanta. Ajuste aqui se o vaso ficar flutuando/enterrado.
         -- A planta plantada num vaso nasce em heightOffset + plantHeightOffset (não existe mais um
         -- offset separado por semente, Config.Plants[seed].potHeightOffset foi removido).
@@ -229,10 +235,20 @@ Config.EnableDryingRacks = true
 
 Config.DryingRacks = {
     ['secador'] = {
-        label = 'Varal de Secagem',
-        model = 'bkr_prop_weed_drying_01a', -- confirmado em mri_Qadmin/data/object.lua. Alternativas pra trocar aqui se o visual não for o esperado: bkr_prop_weed_dry_01a, bkr_prop_weed_dry_02a, bkr_prop_weed_dry_02b, bkr_prop_weed_drying_02a, h4_prop_h4_weed_dry_01a
+        label = 'Rede de Secagem',
+        model = 'prop_redinha_06', -- redinha de 6 bandejas (resource `redinha`, dependency, origem no piso). Antigo/nativo do GTA, se precisar voltar: bkr_prop_weed_drying_01a
         heightOffset = 0.0, -- altura (metros) do secador em relação ao chão, mesmo esquema do Config.Pots - ajuste se ficar flutuando/enterrado
-        capacity = 10, -- quantidade máxima de erva crua por secagem (uma "fornada")
+        capacity = 48, -- quantidade máxima de erva crua por secagem (uma "fornada") - 6 bandejas × 8 buds
+        -- Buds aparecendo nas bandejas enquanto secam (client/cl_dryingracks.lua), 1 prop por unidade,
+        -- enchendo de baixo pra cima. levels = altura de cada bandeja a partir do piso do prop (vem do
+        -- build_redinha.py, TRAYS); radius = distância do poste; zOffset = ajuste fino em cima da tela.
+        buds = {
+            prop = 'bkr_prop_weed_bud_01a', -- mesma bud pequena que a erva crua vira quando cai no chão (painel do mri_Qbox, "Item no chão vira prop"); a _02a é gigante
+            levels = { 0.55, 0.75, 0.95, 1.15, 1.35, 1.55 },
+            perLevel = 8,
+            radius = 0.2,
+            zOffset = 0.01,
+        },
         duration = 10, -- minutos até a secagem terminar
         dries = { -- item cru (colhido da planta) -> item seco (o que você recolhe depois), 1 pra 1
             ['weed_lemonhaze'] = 'weed_lemonhaze_dried',
@@ -247,6 +263,52 @@ Config.DryingRacks = {
             ['weed_limegreenskunk'] = 'weed_limegreenskunk_dried',
             ['weed_rainbowbelts'] = 'weed_rainbowbelts_dried',
         },
+        -- Cura: a MESMA rede, em lugar fechado (tem teto em cima) com ventilador LIGADO perto
+        -- (Config.Fans), devolve a erva curada em vez da seca. Confere ao pendurar e ao recolher -
+        -- se o ventilador não estiver ligado na hora de recolher, sai seca. Seca vai pra prensa
+        -- (tijolo); só a curada é dichavada/ensacada (Config.ProcessingTables).
+        cures = {
+            ['weed_lemonhaze'] = 'weed_lemonhaze_curada',
+            ['weed_ogkush'] = 'weed_ogkush_curada',
+            ['weed_nlights'] = 'weed_nlights_curada',
+            ['weed_dosidos'] = 'weed_dosidos_curada',
+            ['weed_acapulcogold'] = 'weed_acapulcogold_curada',
+            ['weed_colombiangold'] = 'weed_colombiangold_curada',
+            ['weed_limegreenskunk'] = 'weed_limegreenskunk_curada',
+            ['weed_rainbowbelts'] = 'weed_rainbowbelts_curada',
+        },
+        roofCheckHeight = 1.9, -- o raio do "tem teto?" sai daqui pra cima (acima do topo da redinha, 1,80 m), pra não bater na própria rede
+        cureSlowRate = 0.25, -- curando com o ventilador desligado/longe, o tempo anda a essa velocidade (0.25 = 4x mais devagar)
+    },
+}
+
+-- Ventilador: item que se posiciona (igual vaso/lâmpada) e liga/desliga pelo ALT. Ligado a até
+-- `range` metros de uma rede em lugar fechado, faz a rede curar a erva (Config.DryingRacks[x].cures).
+Config.EnableFans = true
+Config.Fans = {
+    ['ventilador'] = {
+        label = 'Ventilador',
+        model = 'bkr_prop_weed_fan_floor_01a', -- ventilador de chão das fazendas de maconha (DLC Bikers), confirmado em mri_Qadmin/data/object.lua
+        range = 5.0, -- metros até a rede; também é o círculo que aparece segurando ALT ao posicionar
+    },
+}
+
+-- Gerador: ventilador e lâmpada só funcionam ligados por EXTENSÃO num gerador com gasolina
+-- (sv_generators.lua). O jogador usa o item extensão, mira no gerador [E] e depois no aparelho [E];
+-- a extensão é gasta ao conectar e volta ao desconectar/recolher. Abastece com o galão do posto
+-- (jerrycan do cdn-fuel, litros no metadata `cdn_fuel`). Gasta litersPerHour por aparelho FUNCIONANDO
+-- (lâmpada conectada, ventilador conectado e ligado). Desligando o sistema (false), tudo tem energia como antes.
+Config.EnableGenerators = true
+Config.ExtensionItem = 'extensao'
+Config.FuelItem = 'jerrycan' -- galão do posto (cdn-fuel)
+Config.Generators = {
+    ['gerador'] = {
+        label = 'Gerador',
+        model = 'prop_generator_01a', -- geradorzinho portátil com rodinha (o 03b era grande demais), confirmado no jogo
+        tank = 20.0, -- litros
+        litersPerHour = 1.0, -- por aparelho funcionando
+        maxDevices = 5,
+        cableLength = 10.0, -- metros máximos da extensão (gerador -> aparelho)
     },
 }
 
@@ -477,7 +539,7 @@ Config.Plants = { -- Create seeds for drugs
         label = 'Lemon Haze', --
         plantType = 'plant1', -- Choose plant types from (plant1, plant2, small_plant)
         products = { -- Item the plant is going to produce when harvested with the max amount - também define quantos brotos aparecem no minigame de colheita (ver Config.HarvestMinigame)
-            ['weed_lemonhaze'] = {min = 4, max = 12},
+            ['weed_lemonhaze'] = {min = 3, max = 9}, -- max = brotos com 100% de pureza e bem cuidada (Config.Purity)
             --['other_item'] = {min = 1, max = 2}
         },
         seed = {
@@ -511,7 +573,7 @@ Config.Plants = { -- Create seeds for drugs
         label = 'OG Kush',
         plantType = 'ogkush_plant',
         products = {
-            ['weed_ogkush'] = {min = 1, max = 4}
+            ['weed_ogkush'] = {min = 3, max = 10}
         },
         seed = { chance = 50, min = 1, max = 2 },
         time = 3000
@@ -521,7 +583,7 @@ Config.Plants = { -- Create seeds for drugs
         label = 'Northern Lights',
         plantType = 'nlights_plant',
         products = {
-            ['weed_nlights'] = {min = 1, max = 4}
+            ['weed_nlights'] = {min = 3, max = 10}
         },
         seed = { chance = 50, min = 1, max = 2 },
         time = 3000
@@ -531,7 +593,7 @@ Config.Plants = { -- Create seeds for drugs
         label = 'Do-Si-Dos',
         plantType = 'dosidos_plant',
         products = {
-            ['weed_dosidos'] = {min = 1, max = 4}
+            ['weed_dosidos'] = {min = 3, max = 11}
         },
         seed = { chance = 50, min = 1, max = 2 },
         time = 3000
@@ -541,7 +603,7 @@ Config.Plants = { -- Create seeds for drugs
         label = 'Acapulco Gold',
         plantType = 'acapulcogold_plant',
         products = {
-            ['weed_acapulcogold'] = {min = 1, max = 4}
+            ['weed_acapulcogold'] = {min = 3, max = 12}
         },
         seed = { chance = 50, min = 1, max = 2 },
         time = 3000
@@ -551,7 +613,7 @@ Config.Plants = { -- Create seeds for drugs
         label = 'Colombian Gold',
         plantType = 'colombiangold_plant',
         products = {
-            ['weed_colombiangold'] = {min = 1, max = 4}
+            ['weed_colombiangold'] = {min = 3, max = 12}
         },
         seed = { chance = 50, min = 1, max = 2 },
         time = 3000
@@ -561,7 +623,7 @@ Config.Plants = { -- Create seeds for drugs
         label = 'Lime Green Skunk',
         plantType = 'limegreenskunk_plant',
         products = {
-            ['weed_limegreenskunk'] = {min = 1, max = 4}
+            ['weed_limegreenskunk'] = {min = 3, max = 13}
         },
         seed = { chance = 50, min = 1, max = 2 },
         time = 3000
@@ -571,10 +633,66 @@ Config.Plants = { -- Create seeds for drugs
         label = 'Rainbow Belts',
         plantType = 'rainbowbelts_plant',
         products = {
-            ['weed_rainbowbelts'] = {min = 1, max = 4}
+            ['weed_rainbowbelts'] = {min = 3, max = 14}
         },
         seed = { chance = 50, min = 1, max = 2 },
         time = 3000
+    },
+}
+
+-- ┌──────────────────────────────────────────────────────────┐
+-- │ Pureza + genéticas novas                                  │
+-- └──────────────────────────────────────────────────────────┘
+--[[
+    Pureza (0-100%) fica no metadata.purity dos itens da maconha: semente -> planta -> erva crua
+    -> seca (secador) -> dichavada -> saquinho (mesa). Semente sem pureza (admin, antiga) conta
+    como Config.Purity.default.
+
+    Na colheita, a semente que volta herda a pureza da mãe: planta bem cuidada ganha
+    gainMin..gainMax (escala com saúde + fertilizante na hora de colher), planta com saúde abaixo
+    de lossHealth perde lossMin..lossMax. Pureza também multiplica quantos brotos a planta dá
+    (yieldAtZero em 0% até 1.0 em 100%) e o preço do saquinho pro NPC (priceAtZero até 1.0).
+]]
+Config.Purity = {
+    default = 10, -- semente sem metadata de pureza (e a do dealer)
+    step = 5, -- pureza arredonda de 5 em 5 pra não picar o inventário em dezenas de pilhas
+    gainMin = 5,
+    gainMax = 20,
+    lossHealth = 50,
+    lossMin = 5,
+    lossMax = 10,
+    yieldAtZero = 0.5,
+    priceAtZero = 0.4,
+    mutationPurity = 10, -- pureza da semente de genética nova que sai da mistura
+}
+
+-- Variedades de maconha: gera as receitas de dichavar/ensacar (Config.ProcessingTables) e a venda
+-- dos saquinhos (Config.SellZones). price = valor do saquinho com 100% de pureza.
+Config.WeedStrains = {
+    lemonhaze = { label = 'Lemon Haze', price = 150 },
+    ogkush = { label = 'OG Kush', price = 180 },
+    nlights = { label = 'Northern Lights', price = 200 },
+    dosidos = { label = 'Do-Si-Dos', price = 230 },
+    acapulcogold = { label = 'Acapulco Gold', price = 270 },
+    colombiangold = { label = 'Colombian Gold', price = 300 },
+    limegreenskunk = { label = 'Lime Green Skunk', price = 350 },
+    rainbowbelts = { label = 'Rainbow Belts', price = 400 },
+}
+
+--[[
+    Genéticas novas: planta de semente com 100% de pureza que recebeu EXATAMENTE essa combinação
+    de fertilizantes durante o crescimento (nem um a mais, nem um a menos - regador não conta) dá
+    1 semente garantida da genética nova na colheita, além da semente normal.
+]]
+Config.Mutations = {
+    ['weed_lemonhaze_seed'] = {
+        { seed = 'ogkush_seed', fertilizers = { liquid_fertilizer = 2, fertilizer = 1 } },
+        { seed = 'nlights_seed', fertilizers = { liquid_fertilizer = 1, fertilizer = 2 } },
+        { seed = 'dosidos_seed', fertilizers = { fertilizer = 3 } },
+        { seed = 'acapulcogold_seed', fertilizers = { fertilizer = 2, advanced_fertilizer = 1 } },
+        { seed = 'colombiangold_seed', fertilizers = { fertilizer = 1, advanced_fertilizer = 2 } },
+        { seed = 'limegreenskunk_seed', fertilizers = { liquid_fertilizer = 3, advanced_fertilizer = 1 } },
+        { seed = 'rainbowbelts_seed', fertilizers = { liquid_fertilizer = 1, advanced_fertilizer = 3 } },
     },
 }
 
@@ -606,7 +724,8 @@ Config.SkillCheck = {
 Config.ProcessingTables = { -- Create processing table
     ['weed_processing_table'] = {
         type = 'weed',
-        model = 'bkr_prop_weed_table_01a', -- Exanples: bkr_prop_weed_table_01a, bkr_prop_meth_table01a, bkr_prop_coke_table01a
+        front = 0.8, -- metros livres na frente (lado comprido, onde o jogador fica): quadrado no chão ao posicionar, bloqueado não deixa por
+        model = 'bkr_prop_weed_table_01b', -- mesa VAZIA (a 01a vem cheia de droga em cima; a bancada põe os props). Outras: bkr_prop_meth_table01a, bkr_prop_coke_table01a
         recipes = {
             ['joint'] = {
                 label = 'Maconha',
@@ -771,6 +890,174 @@ Config.ProcessingTables = { -- Create processing table
 -- │                  |___/     │
 -- └────────────────────────────┘
 
+-- Dichavar (erva CURADA + dichavador -> dichavada, 1 pra 1) e ensacar (dichavadas + plástico ->
+-- saquinho) na mesa de maconha, uma receita de cada por variedade. Só a curada (rede fechada +
+-- ventilador) vira saquinho; a seca vai pra prensa (tijolo). purityFrom = ingrediente cuja
+-- pureza média passa pro item produzido (sv_processing.lua).
+Config.BagSize = 5 -- dichavadas por saquinho
+Config.Prensado = {
+    knifeItem = 'WEAPON_KNIFE', -- faca normal do jogo (ferramenta, não gasta)
+    scaleItem = 'balanca', -- balança de precisão (ferramenta, não gasta): embalar na bancada
+    filmItem = 'plastico_filme', -- rolo de plástico filme (prensado); o zip lock (ziplock) é do camarão
+    filmPerWrap = 1, -- rolos gastos por embalada (cada embalada = cubesPerWrap cubos)
+    budsPerBrick = 30, -- buds secas jogadas na prensa por tijolo
+    pressTime = 15, -- segundos prensando
+    -- emote "mexer" do mri_Qemotes (mexendo no parquímetro, mão calma). walkTo = o boneco anda até a prensa antes de começar
+    pressAnimation = { dict = 'amb@prop_human_parking_meter@female@idle_a', anim = 'idle_a_female', walkTo = true },
+    cubesPerBrick = 45, -- 1 tijolo cortado
+    cubesPerWrap = 10, -- cubos embalados de uma vez (cada arrasto pra balança), gastando 1 zip lock por cubo
+    -- preço do cubo embalado = 40% do saquinho POR QUANTIDADE DE ERVA (tijolo = 30 secas -> 45 cubos;
+    -- saquinho = 5 curadas): Lemon Haze ~$8, Rainbow Belts ~$21 (x pureza). Prensado rende menos que a curada.
+    priceFactor = 0.4,
+}
+
+-- Bancada da mesa de maconha (client/cl_bench.lua + resource itdrugs_bancada, que é a tela da barra de itens).
+-- No E "Usar bancada" a câmera desce na mesa e aparece uma barra com o que o jogador tem (faca, balança,
+-- plástico filme, tijolos, cubos). Ele arrasta da barra pra mesa e o prop aparece onde soltou (o item NÃO
+-- sai do inventário, é só visual). Na mesa: faca em cima do tijolo = corta; cubos em cima da balança = embala
+-- (precisa da balança e do plástico filme na mesa). Quem confere e troca os itens é o servidor (cortar_/embalar_).
+-- Enfeite: along = ao longo do comprimento da mesa, across = na largura, de -0.5 a 0.5 (fração do modelo,
+-- 0 = centro); dz = metros acima do tampo; heading = giro em graus.
+Config.Bench = {
+    table = 'weed_processing_table', -- tipo da mesa (Config.ProcessingTables)
+    topOffset = 0.0, -- correção da altura do tampo (o tampo vem do tamanho do modelo)
+    decorDistance = 40.0, -- metros: mais longe que isso o enfeite some
+    animation = { dict = 'amb@prop_human_parking_meter@female@idle_a', anim = 'idle_a_female' }, -- emote "mexer"
+    decor = { -- fica sempre em cima da mesa
+        { model = 'bkr_prop_weed_leaf_dry_01a', along = 0.32, across = 0.30, heading = 60 },
+        { model = 'bkr_prop_weed_leaf_dry_01a', along = -0.36, across = 0.28, heading = 200 },
+    },
+    -- espaços marcados no tampo (borda tracejada arredondada com neon + nome), em volta do meio (Fabricação, onde se
+    -- corta e embala). along/across = centro em METROS a partir do meio da mesa (along = pro lado; across negativo =
+    -- frente, onde o jogador fica); w/d = largura/profundidade em metros; color = cor do neon (r, g, b);
+    -- prop = deslocamento do prop dentro do espaço (metros), pra modelo com a origem fora do meio. Cada item só entra no seu.
+    slots = {
+        center = { label = 'Fabricação', along = 0.00, across = -0.02, w = 0.34, d = 0.26, color = { 90, 255, 150 } },
+        knife = { label = 'Faca', along = -0.30, across = -0.02, w = 0.11, d = 0.32, color = { 255, 95, 95 }, prop = { 0.0, 0.12 } },
+        -- espaços de cubos (pile = true): um por variedade; dá pra pesar de vários e misturar no meio
+        pile1 = { label = 'Cubos', pile = true, along = -0.54, across = 0.25, w = 0.22, d = 0.18, color = { 255, 190, 70 } },
+        pile2 = { label = 'Cubos', pile = true, along = -0.54, across = 0.00, w = 0.22, d = 0.18, color = { 255, 190, 70 } },
+        pile3 = { label = 'Cubos', pile = true, along = -0.54, across = -0.25, w = 0.22, d = 0.18, color = { 255, 190, 70 } },
+        scale = { label = 'Balança', along = 0.40, across = -0.04, w = 0.36, d = 0.36, color = { 80, 210, 255 } },
+        film = { label = 'Plástico filme', along = 0.40, across = 0.27, w = 0.34, d = 0.12, color = { 200, 130, 255 } },
+        wrapped = { label = 'Prontos', along = -0.05, across = 0.27, w = 0.44, d = 0.14, color = { 255, 120, 210 } },
+        -- modo camarão (mode = 'camarao'; sem mode = prensado): dichavador no meio e a tampa aberta do lado
+        grinder = { label = 'Dichavador', mode = 'camarao', along = 0.00, across = -0.02, w = 0.20, d = 0.20, color = { 90, 255, 150 } },
+        lid = { label = 'Tampa', mode = 'camarao', along = 0.20, across = -0.02, w = 0.18, d = 0.18, color = { 255, 190, 70 } },
+        cscale = { label = 'Balança', mode = 'camarao', along = 0.45, across = -0.04, w = 0.30, d = 0.30, color = { 80, 210, 255 } },
+        cready = { label = 'Produto pronto', mode = 'camarao', along = 0.00, across = 0.25, w = 0.36, d = 0.14, color = { 255, 120, 210 } },
+        cbag = { label = 'Zip lock', mode = 'camarao', along = 0.45, across = 0.25, w = 0.18, d = 0.12, color = { 200, 130, 255 } },
+        -- pilhas de buds curadas (buds = true): uma variedade por espaço; arrasta uma de cada vez pro dichavador
+        buds1 = { label = 'Buds', mode = 'camarao', buds = true, along = -0.30, across = 0.20, w = 0.18, d = 0.14, color = { 120, 220, 255 } },
+        buds2 = { label = 'Buds', mode = 'camarao', buds = true, along = -0.30, across = -0.02, w = 0.18, d = 0.14, color = { 120, 220, 255 } },
+        buds3 = { label = 'Buds', mode = 'camarao', buds = true, along = -0.30, across = -0.24, w = 0.18, d = 0.14, color = { 120, 220, 255 } },
+    },
+    -- modo camarão: dichavador de 2 peças (resource mri_dichavador; as origens coincidem com ele fechado)
+    grinder = {
+        item = 'dichavador',
+        base = 'mri_dichavador_base',
+        lid = 'mri_dichavador_tampa',
+        bud = 'bkr_prop_weed_bud_01a', -- bud curada dentro dele (encolhida até budSize)
+        budSize = 0.17, -- metros: maior lado de cada bud na mesa e no dichavador
+        capacity = 1, -- buds por vez no dichavador: 1 bud = 1 dichavada = 1 saquinho
+        ground = 'h4_prop_h4_weed_dry_01a', -- a dichavada dentro do dichavador / indo pra balança (encolhida até groundSize)
+        groundSize = 0.12,
+        bagItem = 'ziplock', -- Zip Lock, fica na mesa: 1 por saquinho pronto
+        bagProp = 'bkr_prop_weed_bag_01a', -- zip lock (mesmo prop do prensado)
+        readyProp = 'sf_prop_sf_bag_weed_01b', -- saquinho com maconha no Produto pronto
+        spinTime = 2000, -- ms girando a tampa
+        size = 0.14, -- metros: diâmetro na mesa (o modelo tem 7 cm; aumentado pela matriz, igual os cubinhos)
+        height = 0.028, -- metros: origem das peças acima do tampo (metade da altura dele fechado, já com o aumento)
+    },
+    pileSlots = { 'pile1', 'pile2', 'pile3' }, -- ordem em que os espaços de cubos são usados
+    budSlots = { 'buds1', 'buds2', 'buds3' }, -- camarão: ordem dos espaços de buds
+    maxBuds = 50, -- camarão: buds curadas por espaço (por variedade) na mesa
+    maxPlastic = 50, -- camarão: saquinhos plásticos na mesa
+    -- estoque da mesa: cubos e zip lock soltos nela SAEM do inventário (botão direito devolve)
+    maxCubes = 85, -- cubos por espaço (por variedade)
+    maxFilm = 20, -- rolos de plástico filme na mesa
+    props = { -- prop de cada coisa arrastada pra mesa
+        knife = 'prop_w_me_knife_01',
+        scale = 'bkr_prop_coke_scale_01',
+        film = 'mri_rolo_plastico_filme', -- rolo de plástico filme (resource mri_plastico_filme, 30 cm, eixo comprido em X)
+        brick = 'prop_weed_block_01', -- tijolo de maconha
+        cube = 'hei_prop_heist_weed_block_01b', -- cubinho: o bloco de maconha encolhido até cubeSize
+        wrapped = 'ba_prop_battle_weed_bigbag_01a', -- os 10 cubos embalados no filme (Prontos), encolhido até wrappedSize
+    },
+    -- giro da faca (x, y, z em graus). O modelo prop_w_me_knife_01 já vem em pé: 0,0,0 = em pé (cortando)
+    knifeFlat = vector3(90.0, 0.0, 0.0), -- deitada na mesa; se ficar de lado errado, troca pra vector3(0.0, 90.0, 0.0) ou -90
+    knifeUp = vector3(0.0, 0.0, 0.0), -- em pé na hora de cortar
+    knifeLift = 0.15, -- metros: altura da faca em pé acima do tijolo na hora de cortar
+    wrappedSize = 0.12, -- metros: saquinho pronto no Produto pronto (camarão)
+    packSize = 0.045, -- metros: cada cubo embalado no plástico filme (prensado), um pacotinho por cubo
+    cubeSize = 0.05, -- metros: maior lado de cada cubinho (pilha = 6 cubinhos, na balança = 3)
+    scaleTop = 0.13, -- metros: altura do prato da balança (onde os cubos ficam pesando)
+    camHeight = 1.75, -- metros acima do tampo (mais alto = cabe mais mesa na tela)
+    camBack = 0.35, -- quanto a câmera recua pro lado do jogador (fração da largura; o boneco some enquanto usa)
+    grabRadius = 0.04, -- distância na tela (fração da altura) do mouse até o prop pra pegar
+    dropRadius = 0.07, -- distância na tela pra soltar a faca em cima do tijolo
+    scaleRadius = 0.12, -- distância na tela pra pegar a balança e soltar os cubos nela (alvo maior)
+}
+for strain, data in pairs(Config.WeedStrains) do
+    local cured, ground = ('weed_%s_curada'):format(strain), ('weed_%s_dichavada'):format(strain)
+    local recipes = Config.ProcessingTables['weed_processing_table'].recipes
+    recipes['dichavar_' .. strain] = {
+        label = 'Dichavar ' .. data.label,
+        ingrediants = { [cured] = Config.BagSize },
+        tools = { ['dichavador'] = 1 },
+        outputs = { [ground] = Config.BagSize },
+        bench = strain, -- feito na bancada, modo camarão (cl_bench.lua), não aparece solto no E
+        purityFrom = cured,
+        processTime = 5,
+        failChance = 0,
+        animation = { dict = 'mini@repair', anim = 'fixing_a_ped' }
+    }
+    recipes['ensacar_' .. strain] = {
+        label = 'Ensacar ' .. data.label,
+        ingrediants = { [ground] = Config.BagSize, ['plastic'] = 1 },
+        outputs = { [('weed_%s_saquinho'):format(strain)] = 1 },
+        purityFrom = ground,
+        processTime = 5,
+        failChance = 0,
+        animation = { dict = 'mini@repair', anim = 'fixing_a_ped' }
+    }
+
+    -- Prensado: tijolo (seca prensada) -> cortar com faca em cubos -> embalar no plástico filme
+    local brick, cube, wrapped = 'tijolo_' .. strain, ('cubo_%s'):format(strain), ('cubo_%s_embalado'):format(strain)
+    recipes['cortar_' .. strain] = {
+        label = 'Cortar Tijolo de ' .. data.label,
+        ingrediants = { [brick] = 1 },
+        tools = { [Config.Prensado.knifeItem] = 1 },
+        outputs = { [cube] = Config.Prensado.cubesPerBrick },
+        bench = strain, -- feito na bancada (cl_bench.lua), não aparece como opção solta no E
+        purityFrom = brick,
+        processTime = 5,
+        failChance = 0,
+        animation = { dict = 'mini@repair', anim = 'fixing_a_ped' }
+    }
+    recipes['embalar_' .. strain] = {
+        label = 'Embalar Cubos de ' .. data.label,
+        ingrediants = { [cube] = Config.Prensado.cubesPerWrap, [Config.Prensado.filmItem] = Config.Prensado.filmPerWrap },
+        tools = { [Config.Prensado.scaleItem] = 1 },
+        outputs = { [wrapped] = Config.Prensado.cubesPerWrap },
+        bench = strain,
+        purityFrom = cube,
+        processTime = 5,
+        failChance = 0,
+        animation = { dict = 'mini@repair', anim = 'fixing_a_ped' }
+    }
+end
+
+-- Prensa: Config.Prensado manda em todas as receitas (quantas secas, tempo, animação do operador da prensa);
+-- o tijolo carrega a pureza média da seca (Config.Purity), igual dichavar/ensacar
+for _, recipe in pairs(Config.ProcessingTables['prensa'].recipes) do
+    local dried = next(recipe.ingrediants)
+    recipe.ingrediants = { [dried] = Config.Prensado.budsPerBrick }
+    recipe.purityFrom = dried
+    recipe.processTime = Config.Prensado.pressTime
+    recipe.animation = Config.Prensado.pressAnimation
+end
+
 --[[ Possible Drug Effects:
     stressDecrease,
     runningSpeedIncrease, 
@@ -851,8 +1138,18 @@ Config.Drugs = { -- Create you own drugs
 -- │                        |___/ │
 -- └──────────────────────────────┘
 
----@desativado Estamos usando o qbx_drugs para vendas de drogas (é melhor!)
-Config.EnableSelling = false -- Enable selling system
+-- Ligado só pros saquinhos de maconha (preço × pureza, ver Config.Purity) - joint/cocaína
+-- continuam na venda de esquina do qbx_drugs.
+Config.EnableSelling = true -- Enable selling system
+
+-- Preço fixo (sem math.random): esse arquivo roda separado no client e no server, um sorteio
+-- aqui dava um preço no menu e outro no pagamento.
+local weedBagSales = {}
+for strain, data in pairs(Config.WeedStrains) do
+    weedBagSales[#weedBagSales + 1] = { item = ('weed_%s_saquinho'):format(strain), price = data.price }
+    local herbPerCube = Config.Prensado.budsPerBrick / Config.Prensado.cubesPerBrick
+    weedBagSales[#weedBagSales + 1] = { item = ('cubo_%s_embalado'):format(strain), price = math.max(1, math.floor(data.price / Config.BagSize * herbPerCube * Config.Prensado.priceFactor + 0.5)) }
+end
 
 Config.MinimumCops = 0 -- Minimum cops required to sell drugs
 Config.OnlyCopsOnDuty = true -- Check if cops are on-duty (Only QBCore).
@@ -885,11 +1182,7 @@ Config.SellZones = {
             vec3(130.0, -2029.0, 30.0),
         },
         thickness = 27,
-        drugs = {
-            { item = 'cocaine', price = math.random(100, 200)},
-            { item = 'joint', price = math.random(50, 100)},
-            { item = 'weed_lemonhaze', price = math.random(50, 100)}
-        }
+        drugs = weedBagSales
     },
     ['vinewood'] = {
         points = {
@@ -906,11 +1199,7 @@ Config.SellZones = {
             vec3(667.0, -9.0, 84.0),
         },
         thickness = 59.0,
-        drugs = {
-            { item = 'cocaine', price = math.random(100, 200)},
-            { item = 'joint', price = math.random(50, 100)},
-            { item = 'weed_lemonhaze', price = math.random(50, 100)}
-        }
+        drugs = weedBagSales
     },
     ['beach'] = {
         points = {
@@ -925,11 +1214,7 @@ Config.SellZones = {
             vec3(-1349.0, -1285.0, 5.0),
         },
         thickness = 4.0,
-        drugs = {
-            { item = 'cocaine', price = math.random(100, 200)},
-            { item = 'joint', price = math.random(50, 100)},
-            { item = 'weed_lemonhaze', price = math.random(50, 100)}
-        }
+        drugs = weedBagSales
     },
 }
 

@@ -25,7 +25,7 @@ RegisterNetEvent('it-drugs:client:placeProcessingTable', function(tableItem, met
 
     it.placeObjectWithRotation(hashModel, "spoon", function(coords, rotation)
         placeProcessingTable(tableItem, coords, rotation, metadata)
-    end)
+    end, nil, tableConfig.front)
 end)
 
 RegisterNetEvent('it-drugs:client:useTable', function(data)
@@ -36,14 +36,40 @@ RegisterNetEvent('it-drugs:client:useTable', function(data)
     end, netId)
 end)
 
+-- Opções do E da mesa (cl_target.lua, sem painel): pegam o handle do servidor e seguem o fluxo de sempre
+RegisterNetEvent('it-drugs:client:tableRecipe', function(args)
+    local result = lib.callback.await('it-drugs:server:getTableData', false, NetworkGetNetworkIdFromEntity(args.entity))
+    if not result then return end
+    TriggerEvent('it-drugs:client:processDrugs', { entity = result.entity, object = args.entity, type = args.type, recipe = args.recipe })
+end)
+
+RegisterNetEvent('it-drugs:client:tableTake', function(args)
+    local result = lib.callback.await('it-drugs:server:getTableData', false, NetworkGetNetworkIdFromEntity(args.entity))
+    if not result then return end
+    if result.notEmpty then return ShowNotification(nil, _U('NOTIFICATION__TABLE__NOT__EMPTY'), 'error') end
+    TriggerEvent('it-drugs:client:removeTable', { entity = result.entity })
+end)
+
 RegisterNetEvent('it-drugs:client:processDrugs', function(args)
     local entity = args.entity
+    local object = args.object -- handle do client (entity é o do servidor); só vem pelo E
     local type = args.type
     local recipe = Config.ProcessingTables[type].recipes[args.recipe]
     if proccessing then return end
 
-    local input = lib.inputDialog(_U('INPUT__AMOUNT__HEADER'), {
-        {type = 'number', text = _U('INPUT__AMOUNT__TEXT'), desciption = _U('INPUT__AMOUNT__DESCRIPTION'), require = true, min = 1}
+    -- máximo de vezes = o que os ingredientes do inventário dão (o servidor confere de novo a cada vez)
+    local max = math.huge
+    for item, itemAmount in pairs(recipe.ingrediants) do
+        max = math.min(max, math.floor((tonumber(it.getItemCount(item)) or 0) / itemAmount))
+    end
+    if max < 1 then
+        ShowNotification(nil, _U('NOTIFICATION__MISSING__INGIDIANT'), 'error')
+        return
+    end
+
+    local input = lib.inputDialog(recipe.label, {
+        { type = 'number', label = _U('INPUT__AMOUNT__TEXT'), description = _U('INPUT__PROCESS__DESC'):format(max), required = true, min = 1, max = max, default = max },
+        { type = 'checkbox', label = _U('INPUT__DRYINGRACK__MAX'):format(max) },
     })
 
     if not input then
@@ -51,7 +77,8 @@ RegisterNetEvent('it-drugs:client:processDrugs', function(args)
         return
     end
 
-    local amount = tonumber(input[1])
+    local amount = input[2] and max or math.min(math.floor(tonumber(input[1]) or 0), max)
+    if amount < 1 then return end
     for item, itemAmount in pairs(recipe.ingrediants) do
         if not it.hasItem(item, itemAmount * amount) then
             ShowNotification(nil, _U('NOTIFICATION__MISSING__INGIDIANT'), 'error')
@@ -71,16 +98,27 @@ RegisterNetEvent('it-drugs:client:processDrugs', function(args)
     end
 
     local ped = PlayerPedId()
-    TaskTurnPedToFaceEntity(ped, entity, 1.0)
+    if recipe.animation and recipe.animation.walkTo and object and DoesEntityExist(object) then
+        it.walkToPlace(GetEntityCoords(object)) -- chega perto e vira pra mesa
+    elseif object then
+        TaskTurnPedToFaceEntity(ped, object, 1.0)
+    end
     Wait(200)
 
     proccessing = true
 
-    RequestAnimDict(recipe.animation.dict)
-    while not HasAnimDictLoaded(recipe.animation.dict) do 
-        Wait(0)
+    -- receita sem animation = só a barra de progresso
+    local anim = recipe.animation
+    if anim then
+        RequestAnimDict(anim.dict)
+        while not HasAnimDictLoaded(anim.dict) do
+            Wait(0)
+        end
+        TaskPlayAnim(ped, anim.dict, anim.anim, 8.0, 8.0, -1, 1, 0, false, false, false)
     end
-    TaskPlayAnim(ped, recipe.animation.dict, recipe.animation.anim, 8.0, 8.0, -1, 1, 0, false, false, false)
+    local function stopAnim()
+        if anim then RemoveAnimDict(anim.dict) end
+    end
     if Config.ProcessingSkillCheck then
         for i = 1, amount, 1 do
             local success = lib.skillCheck(Config.SkillCheck.difficulty, Config.SkillCheck.keys)
@@ -91,14 +129,14 @@ RegisterNetEvent('it-drugs:client:processDrugs', function(args)
                 proccessing = false
                 ShowNotification(nil, _U('NOTIFICATION__SKILL__ERROR'), 'error')
                 ClearPedTasks(ped)
-                RemoveAnimDict(recipe.animation.dict)
+                stopAnim()
                 return
             end
             Wait(1000)
         end
         proccessing = false
         ClearPedTasks(ped)
-        RemoveAnimDict(recipe.animation.dict)
+        stopAnim()
     else
         for i = 1, amount, 1 do
             if lib.progressBar({
@@ -116,13 +154,13 @@ RegisterNetEvent('it-drugs:client:processDrugs', function(args)
             else
                 ShowNotification(nil, _U('NOTIFICATION__CANCELED'), "error")
                 ClearPedTasks(ped)
-                RemoveAnimDict(recipe.animation.dict)
+                stopAnim()
             end
             Wait(1000)
         end
         proccessing = false
         ClearPedTasks(ped)
-        RemoveAnimDict(recipe.animation.dict)
+        stopAnim()
     end
 end)
 
@@ -137,3 +175,4 @@ RegisterNetEvent('it-drugs:client:removeTable', function(args)
         TriggerServerEvent('it-drugs:server:removeTable', {entity = entity})
     end
 end)
+

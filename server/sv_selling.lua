@@ -42,7 +42,14 @@ RegisterNetEvent('it-drugs:server:initiatedrug', function(cad)
 		if amount < Config.SellSettings['sellAmount'].min or amount > Config.SellSettings['sellAmount'].max then return end
 		cad.amount = amount
 
-		local price = basePrice * amount
+		-- Preço × pureza (Config.Purity) dos itens mais puros, que são os que saem primeiro - mesma
+		-- conta do menu de oferta (it-drugs:server:getSellPurity)
+		local purity = it.peekPurity(src, cad.item, amount)
+		if not purity then
+			ShowNotification(src, _U('NOTIFICATION__NO__ITEM__LEFT'):format(cad.item), 'error')
+			return
+		end
+		local price = math.floor(basePrice * it.purityPriceFactor(purity)) * amount
 		if Config.SellSettings['giveBonusOnPolice'] then
 			local copsamount = getCopsAmount()
 			if copsamount > 0 and copsamount < 3 then
@@ -57,7 +64,7 @@ RegisterNetEvent('it-drugs:server:initiatedrug', function(cad)
 		end
 		price = math.floor(price)
 		if it.hasItem(src, cad.item, cad.amount) then
-			if it.removeItem(src, tostring(cad.item), cad.amount) then
+			if it.takeItemWithPurity(src, tostring(cad.item), cad.amount) then
 				math.randomseed(GetGameTimer())
 				local stealChance = math.random(0, 100)
 				if stealChance < Config.SellSettings['stealChance'] then
@@ -76,6 +83,10 @@ RegisterNetEvent('it-drugs:server:initiatedrug', function(cad)
 			ShowNotification(src, _U('NOTIFICATION__NO__ITEM__LEFT'):format(cad.item), 'error')
 		end
 	end
+end)
+
+lib.callback.register('it-drugs:server:getSellPurity', function(source, item, amount)
+	return it.peekPurity(source, item, amount)
 end)
 
 lib.callback.register('it-drugs:server:getCopsAmount', function(source)

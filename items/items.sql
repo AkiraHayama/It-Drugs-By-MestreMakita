@@ -15,7 +15,7 @@ INSERT INTO `items` (`name`, `label`, `weight`, `rare`, `can_remove`) VALUES
 	('cocaine_processing_table', 'cocaine_processing_table', 1000, 0, 1),
 	('vaso', 'Vaso de Plantio', 2000, 0, 1),
 	('terra', 'Saco de Terra', 1000, 0, 1),
-	('secador', 'Varal de Secagem', 2000, 0, 1),
+	('secador', 'Rede de Secagem', 2000, 0, 1),
 	('weed_lemonhaze_dried', 'Maconha Seca', 20, 0, 1),
 	('portable_lamp', 'Lâmpada Portátil', 1500, 0, 1),
 	('reflector_lamp', 'Lâmpada Portátil (Refletora)', 1500, 0, 1),

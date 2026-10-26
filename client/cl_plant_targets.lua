@@ -11,12 +11,37 @@ if not Config.Target then return end
 -- qualquer prop, customizado ou não.
 
 local zones = {} -- plant id -> zone handle (ox_target zone id / qb-target zone name)
+local potPlantCoords = {} -- coords das plantas que estão em vaso (reconstruído a cada sync)
 
-local openPlantMenu = function(plantId)
+local findPotEntity = function(coords)
+    for _, pot in pairs(Config.Pots or {}) do
+        for _, model in pairs({ pot.model, pot.soilModel }) do
+            local entity = GetClosestObjectOfType(coords.x, coords.y, coords.z, 0.5, joaat(model), false, false, false)
+            if entity ~= 0 then return entity end
+        end
+    end
+end
+
+--- Vaso com planta esconde o "Usar Vaso" (cl_target.lua) - quem responde é o alvo da própria planta
+function IsPotPlanted(potEntity)
+    local potCoords = GetEntityCoords(potEntity)
+    for _, coords in ipairs(potPlantCoords) do
+        if #(potCoords.xy - coords.xy) < 0.5 then return true end
+    end
+    return false
+end
+
+local openPlantMenu = function(plant)
+    -- Planta em vaso abre pelo fluxo do vaso, senão o menu perde o "Mover Vaso"
+    local pot = plant.potId and findPotEntity(plant.coords)
+    if pot then
+        TriggerEvent('it-drugs:client:checkPot', { entity = pot })
+        return
+    end
     lib.callback('it-drugs:server:getPlantDataWithId', false, function(result)
         if not result then return end
         TriggerEvent('it-drugs:client:showPlantMenu', result)
-    end, plantId)
+    end, plant.id)
 end
 
 local registerPlantZone = function(plant)
@@ -44,7 +69,7 @@ local registerPlantZone = function(plant)
                     icon = 'fas fa-eye',
                     label = _U('TARGET__PLANT__LABEL'),
                     action = function()
-                        openPlantMenu(plant.id)
+                        openPlantMenu(plant)
                     end
                 }
             },
@@ -62,7 +87,7 @@ local registerPlantZone = function(plant)
                     icon = 'fas fa-eye',
                     label = _U('TARGET__PLANT__LABEL'),
                     onSelect = function()
-                        openPlantMenu(plant.id)
+                        openPlantMenu(plant)
                     end,
                     distance = zoneDistance
                 }
@@ -88,8 +113,10 @@ end
 local syncAllPlantZones = function()
     removeAllPlantZones()
     local allPlants = lib.callback.await('it-drugs:server:getPlants', false)
+    potPlantCoords = {}
     for _, plant in pairs(allPlants or {}) do
         registerPlantZone(plant)
+        if plant.potId then potPlantCoords[#potPlantCoords + 1] = plant.coords end
     end
 end
 

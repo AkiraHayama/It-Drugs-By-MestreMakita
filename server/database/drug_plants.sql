@@ -15,3 +15,5 @@ ALTER TABLE drug_plants ADD IF NOT EXISTS budsHarvested TINYINT(1) NOT NULL DEFA
 UPDATE drug_plants SET growth = LEAST(100, GREATEST(0, (UNIX_TIMESTAMP() - time) * 100 / (growtime * 60))) WHERE growth IS NULL;
 UPDATE drug_plants SET sunlight = 85 WHERE sunlight IS NULL;
 UPDATE drug_plants SET addedLight = 0 WHERE addedLight IS NULL;
+ALTER TABLE drug_plants ADD IF NOT EXISTS purity DOUBLE NOT NULL DEFAULT 10;
+ALTER TABLE drug_plants ADD IF NOT EXISTS fertilizerLog LONGTEXT DEFAULT NULL;

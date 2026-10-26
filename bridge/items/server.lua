@@ -175,3 +175,41 @@ RegisterNetEvent('it-drugs:toggleItem', function(toggle, name, amount, metadata)
     if not ConsumableItems[name] then return end
     it.toggleItem(source, toggle, name, 1, metadata)
 end)
+-- Slots do item, mais puros primeiro (metadata.purity, ver Config.Purity) - só ox_inventory
+local function puritySlots(source, item)
+    local slots = {}
+    for _, slot in ipairs(ox_inventory:Search(source, 'slots', item) or {}) do
+        slots[#slots + 1] = { slot = slot.slot, count = slot.count, purity = slot.metadata and slot.metadata.purity or Config.Purity.default }
+    end
+    table.sort(slots, function(a, b) return a.purity > b.purity end)
+    return slots
+end
+
+--- Pureza média das `amount` unidades mais puras de `item`, sem tirar nada (nil se não tiver isso tudo)
+function it.peekPurity(source, item, amount)
+    if it.inventory ~= 'ox' then return it.hasItem(source, item, amount) and Config.Purity.default or nil end
+    local left, sum = amount, 0
+    for _, slot in ipairs(puritySlots(source, item)) do
+        local take = math.min(left, slot.count)
+        sum, left = sum + take * slot.purity, left - take
+        if left == 0 then return sum / amount end
+    end
+end
+
+--- Tira `amount` de `item` começando pelos mais puros e devolve a pureza média do que saiu
+--- (nil = não tinha isso tudo, nada foi tirado). Fora do ox_inventory não existe pureza.
+function it.takeItemWithPurity(source, item, amount)
+    if it.inventory ~= 'ox' then
+        return it.removeItem(source, item, amount) and Config.Purity.default or nil
+    end
+    local purity = it.peekPurity(source, item, amount)
+    if not purity then return nil end
+    local left = amount
+    for _, slot in ipairs(puritySlots(source, item)) do
+        local take = math.min(left, slot.count)
+        ox_inventory:RemoveItem(source, item, take, nil, slot.slot)
+        left = left - take
+        if left == 0 then break end
+    end
+    return purity
+end

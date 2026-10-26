@@ -96,6 +96,7 @@ local plantSeed = function(ped, plant, plantInfos, plantItem, coords, metadata)
         end
     end
 
+    it.walkToPlace(coords) -- lugar válido: anda até ele (com a planta fantasma ainda no chão) antes de plantar
     DeleteObject(plant)
 
     if it.playAnimatedProgress(_U('PROGRESSBAR__SPAWN__PLANT'), plantInfos.time) then
@@ -113,6 +114,11 @@ RegisterNetEvent('it-drugs:client:useSeed', function(plantItem, metadata)
     local plantInfos = Config.Plants[plantItem]
     if GetVehiclePedIsIn(PlayerPedId(), false) ~= 0 then
         ShowNotification(nil, _U('NOTIFICATION__IN__VEHICLE'), "error")
+        return
+    end
+
+    if Config.PlantTool and not it.hasItem(Config.PlantTool, 1) then -- plantar no chão precisa da pá de jardim
+        ShowNotification(nil, _U('NOTIFICATION__NO__PLANT__TOOL'), "error")
         return
     end
 
@@ -151,6 +157,7 @@ RegisterNetEvent('it-drugs:client:useSeed', function(plantItem, metadata)
         Wait(0)
         hit, dest, _, _ = it.rayCastCamera(Config.rayCastingDistance)
         if hit == 1 then
+            dest = it.clampToReach(dest) -- não planta longe do boneco (Config.PlaceMaxDistance)
             SetEntityCoords(plant, dest.x, dest.y, dest.z + customOffset)
         
         -- [E] To spawn plant
@@ -286,11 +293,13 @@ end
 --- @param plantCoords vector3
 --- @param type string - seed type (Config.Plants key)
 --- @param fertilizer number - fertilizer% da planta, usado só pra decidir QUANTOS brotos desenhar
-local runHarvestMinigame = function(plantCoords, type, fertilizer)
+local runHarvestMinigame = function(plantCoords, type, fertilizer, purity)
     local mgConfig = Config.HarvestMinigame
     local _, productData = next(Config.Plants[type].products)
     local fertilizerFactor = (fertilizer or 0) / 100
-    local budCount = math.max(math.floor(productData.min + ((productData.max - productData.min) * fertilizerFactor) + 0.5), 1)
+    local budCount = productData.min + ((productData.max - productData.min) * fertilizerFactor)
+    if purity and it.usesPurity(type) then budCount = budCount * it.purityYieldFactor(purity) end -- mesma conta do servidor (giveProducts)
+    budCount = math.max(math.floor(budCount + 0.5), 1)
 
     local ok, hashModel = it.requestModel(mgConfig.prop, 'Config.HarvestMinigame.prop errado')
     if not ok then
@@ -497,7 +506,7 @@ RegisterNetEvent('it-drugs:client:harvestPlant', function(args)
     TaskTurnPedToFaceCoord(ped, coords.x, coords.y, coords.z, 1.0) -- mesmo duration usado no resto do arquivo pra TaskTurnPedToFaceEntity
     Wait(200)
 
-    if runHarvestMinigame(coords, type, fertilizer) then
+    if runHarvestMinigame(coords, type, fertilizer, args.purity) then
         TriggerServerEvent('it-drugs:server:harvestPlant', id)
     else
         ShowNotification(nil, _U('NOTIFICATION__CANCELED'), "error")

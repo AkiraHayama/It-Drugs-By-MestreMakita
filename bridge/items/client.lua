@@ -3,6 +3,19 @@ function it.hasItem(itemName, amount)
     return hasItem
 end
 
+--- Igual it.hasItem, mas sem perguntar pro servidor (lê o inventário que o ox_inventory já tem no client).
+--- Pra canInteract do alvo: ele roda o tempo todo e não pode esperar callback. O servidor confere de novo na ação.
+local countCache = {} -- item -> { count, at }: o E confere dezenas de receitas por frame, lê o inventário no máx. 2x/s por item
+function it.hasItemLocal(itemName, amount)
+    if it.inventory ~= 'ox' then return true end
+    local now, cached = GetGameTimer(), countCache[itemName]
+    if not cached or now - cached.at > 500 then
+        cached = { count = exports.ox_inventory:Search('count', itemName) or 0, at = now }
+        countCache[itemName] = cached
+    end
+    return cached.count >= (amount or 1)
+end
+
 function it.getItemLabel(itemName)
     local itemLabel
     if it.inventory == 'ox' then
@@ -37,4 +50,8 @@ if it.inventory == 'ox' then
     RegisterNetEvent('it-drugs:ox:useItem', function(data, itemInfo)
         TriggerServerEvent('it-drugs:ox:useItem', itemInfo.name, itemInfo.metadata)
     end)
+end
+-- Mostra a pureza (Config.Purity) no tooltip dos itens da maconha
+if it.inventory == 'ox' then
+    exports.ox_inventory:displayMetadata('purity', 'Pureza (%)')
 end

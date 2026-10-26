@@ -45,6 +45,33 @@ if Config.EnableLamps then
     end
 end
 
+if Config.EnableFans then
+    for fan, _ in pairs(Config.Fans) do
+        it.createUsableItem(fan, function(source, data)
+            if it.hasItem(source, fan, 1) then
+                TriggerClientEvent('it-drugs:client:placeFan', source, fan)
+            end
+        end)
+    end
+end
+
+if Config.EnableGenerators then
+    for generator, _ in pairs(Config.Generators) do
+        it.createUsableItem(generator, function(source, data)
+            if it.hasItem(source, generator, 1) then
+                TriggerClientEvent('it-drugs:client:placeGenerator', source, generator)
+            end
+        end)
+    end
+
+    -- extensão: mira no gerador e depois no aparelho (cl_generators.lua); só é gasta ao conectar
+    it.createUsableItem(Config.ExtensionItem, function(source, data)
+        if it.hasItem(source, Config.ExtensionItem, 1) then
+            TriggerClientEvent('it-drugs:client:useExtension', source)
+        end
+    end)
+end
+
 if Config.EnablePots then
     for pot, _ in pairs(Config.Pots) do
         it.createUsableItem(pot, function(source, data)

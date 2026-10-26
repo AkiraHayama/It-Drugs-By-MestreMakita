@@ -27,8 +27,11 @@ client_scripts {
     'client/cl_lamps.lua',
     'client/cl_pots.lua',
     'client/cl_dryingracks.lua',
+    'client/cl_fans.lua',
+    'client/cl_generators.lua',
     'client/cl_waterpoints.lua',
     'client/cl_processing.lua',
+    'client/cl_bench.lua',
     'client/cl_selling.lua',
     'client/cl_target.lua',
     'client/cl_plant_targets.lua',
@@ -47,6 +50,8 @@ server_scripts {
     'server/sv_lamps.lua',
     'server/sv_pots.lua',
     'server/sv_dryingracks.lua',
+    'server/sv_fans.lua',
+    'server/sv_generators.lua',
     'server/sv_waterpoints.lua',
     'server/sv_processing.lua',
     'server/sv_selling.lua',
@@ -62,6 +67,8 @@ files = {
     'server/database/drug_lamps.sql',
     'server/database/drug_pots.sql',
     'server/database/drug_dryingracks.sql',
+    'server/database/drug_fans.sql',
+    'server/database/drug_generators.sql',
     'server/database/drug_waterpoints.sql',
 }
 
@@ -73,7 +80,10 @@ dependencies {
     'bzzz_lights_and_lamps', -- lâmpadas com cor de luz de verdade (bzzz_world_of_lamps_*/bzzz_dream_of_lights_*), precisa estar rodando antes
     'nextgen_weedprops', -- 7 variedades novas de planta de maconha (ng_prop_weed_*), precisa estar rodando antes
     'tesouras_do_makita', -- tesoura 3D usada como "cursor" no minigame de colheita (client/cl_planting.lua), precisa estar rodando antes
-    'bzzz_cutting_weed' -- foice (prop bzzz_prop_sickle_a + anim bzzz_cutting_sickle) usada pra cortar a planta inteira, precisa estar rodando antes
+    'bzzz_cutting_weed', -- foice (prop bzzz_prop_sickle_a + anim bzzz_cutting_sickle) usada pra cortar a planta inteira, precisa estar rodando antes
+    'redinha', -- redinha de secar as buds (prop_redinha_06), model do secador em Config.DryingRacks, precisa estar rodando antes
+    'mri_dichavador', -- dichavador de 2 peças (mri_dichavador_base/_tampa), bancada modo camarão (Config.Bench.grinder)
+    'mri_plastico_filme' -- rolo de plástico filme (mri_rolo_plastico_filme), bancada modo prensado (Config.Bench.props.film)
 }
 
 lua54 'yes'

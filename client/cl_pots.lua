@@ -96,12 +96,16 @@ RegisterNetEvent('it-drugs:client:addSoil', function(args)
     -- seguindo o mesmo padrão aqui: dispara a cada 150ms num thread à parte enquanto a barra roda.
     local ped = PlayerPedId()
     local coords = GetEntityCoords(ped)
-    local model = 'bkr_prop_weed_bigbag_01a'
+    local model = 'saco_terra_nobre_aberto' -- saco Terra Nobre 5 kg (resource terra_nobre); antes era bkr_prop_weed_bigbag_01a
     TaskTurnPedToFaceEntity(ped, entity, 1.0)
     Wait(200)
-    RequestModel(model)
+    local ok = it.requestModel(model, 'saco de terra (resource terra_nobre rodando?)')
+    if not ok then
+        ShowNotification(nil, 'Modelo do saco de terra não carregou (resource terra_nobre)', "error")
+        return
+    end
     RequestNamedPtfxAsset('core')
-    while not HasModelLoaded(model) or not HasNamedPtfxAssetLoaded('core') do Wait(0) end
+    while not HasNamedPtfxAssetLoaded('core') do Wait(0) end
     local created_object = CreateObject(model, coords.x, coords.y, coords.z, true, true, true)
     AttachEntityToEntity(created_object, ped, GetPedBoneIndex(ped, 28422), 0.4, 0.1, 0.0, 90.0, 180.0, 0.0, true, true, false, true, 1, true)
 
@@ -109,7 +113,8 @@ RegisterNetEvent('it-drugs:client:addSoil', function(args)
     CreateThread(function()
         while playingEffect do
             SetPtfxAssetNextCall('core')
-            StartParticleFxNonLoopedOnEntity('bul_dirt', created_object, 0.35, 0.0, 0.25, 0.0, 0.0, 0.0, 0.6, false, false, false)
+            -- terra sai do canto aberto do saco (LEIA-ME do terra_nobre: abertura no canto +X/+Z, saco 34 x 46 cm, origem no centro da base)
+            StartParticleFxNonLoopedOnEntity('bul_dirt', created_object, 0.17, 0.0, 0.40, 0.0, 0.0, 0.0, 0.6, false, false, false)
             Wait(90)
         end
     end)
@@ -180,5 +185,19 @@ RegisterNetEvent('it-drugs:client:takePot', function(args)
 
     if it.playAnimatedProgress(_U('PROGRESSBAR__TAKE__POT'), 3000) then
         TriggerServerEvent('it-drugs:server:takePot', { entity = entity })
+    end
+end)
+
+-- Adubar a terra do vaso depois de cortar a planta (servidor gasta 1 Config.Pots[x].fertilizeItem)
+RegisterNetEvent('it-drugs:client:fertilizeSoil', function(args)
+    if it.playAnimatedProgress(_U('PROGRESSBAR__POT__FERTILIZE'), 3000) then
+        TriggerServerEvent('it-drugs:server:fertilizeSoil', { entity = args.entity })
+    end
+end)
+
+-- Remover a terra do vaso (queimada ou não) - servidor confere de novo que não tem planta
+RegisterNetEvent('it-drugs:client:removeSoil', function(args)
+    if it.playAnimatedProgress(_U('PROGRESSBAR__POT__REMOVE_SOIL'), 3000) then
+        TriggerServerEvent('it-drugs:server:removeSoil', { entity = args.entity })
     end
 end)

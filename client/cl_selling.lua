@@ -120,7 +120,10 @@ RegisterNetEvent('it-drugs:client:checkSellOffer', function(entity)
 		sellAmount = playerItems
 	end
 
-	TriggerEvent('it-drugs:client:showSellMenu', {item = sellItemData.item, price = sellItemData.price, amount = sellAmount, entity = entity})
+	-- Oferta já com o preço × pureza (Config.Purity), igual o servidor vai pagar
+	local purity = lib.callback.await('it-drugs:server:getSellPurity', false, sellItemData.item, sellAmount)
+	local unitPrice = math.floor(sellItemData.price * it.purityPriceFactor(purity))
+	TriggerEvent('it-drugs:client:showSellMenu', {item = sellItemData.item, price = unitPrice, amount = sellAmount, entity = entity})
 	SetTimeout(Config.SellSettings['sellTimeout']*1000, function()
 		if Config.Debug then lib.print.info(_U('INFO__SELL_MENU_TIMEOUT'), lib.getOpenContextMenu()) end
 		if lib.getOpenContextMenu() ~= nil then

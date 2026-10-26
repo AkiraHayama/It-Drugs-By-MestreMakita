@@ -156,7 +156,9 @@ local setupPlants = function()
                 addedLight = v.addedLight or 0,
                 potId = v.potId,
                 stage = stage,
-                budsHarvested = v.budsHarvested == 1
+                budsHarvested = v.budsHarvested == 1,
+                purity = v.purity or Config.Purity.default,
+                fertilizerLog = v.fertilizerLog and json.decode(v.fertilizerLog) or {}
             }
         end
     end
@@ -396,6 +398,8 @@ RegisterNetEvent('it-drugs:server:destroyPlant', function(args)
         })
 
         TriggerClientEvent('it-drugs:client:startPlantFire', -1, plants[entity].coords, stage)
+        -- Queimou: no vaso a terra fica imprópria (vaso volta vazio, precisa de terra nova)
+        if plants[entity].potId and BurnPotSoil then BurnPotSoil(plants[entity].potId) end
         Wait(Config.FireTime / 2)
         DeleteEntity(entity)
 
@@ -403,6 +407,46 @@ RegisterNetEvent('it-drugs:server:destroyPlant', function(args)
         TriggerClientEvent('it-drugs:client:syncPlantList', -1)
     end
 end)
+
+-- Produto cru da planta: quantidade escala com o fertilizante (min..max) e com a pureza
+-- (Config.Purity), e a erva sai com a pureza da planta no metadata. mult = bônus da foice.
+local giveProducts = function(src, plant, mult)
+    local fertilizerFactor = (plant.fertilizer or 0) / 100 -- 0 = colhe o mínimo, 100 = colhe o máximo
+    local purity = it.usesPurity(plant.type) and plant.purity or nil
+    for product, v in pairs(Config.Plants[plant.type].products) do
+        local amount = (v.min + (v.max - v.min) * fertilizerFactor) * mult
+        if purity then amount = amount * it.purityYieldFactor(purity) end
+        it.giveItem(src, product, math.max(1, math.floor(amount + 0.5)), purity and { purity = it.roundPurity(purity) } or nil)
+    end
+end
+
+-- Pureza da semente que volta na colheita: herda a da mãe, ganha conforme o cuidado (saúde +
+-- fertilizante na hora de colher) ou perde se a planta estava mal cuidada
+local nextSeedPurity = function(plant)
+    local p = Config.Purity
+    local purity = plant.purity or p.default
+    if plant.health < p.lossHealth then
+        return it.roundPurity(purity - math.random(p.lossMin, p.lossMax))
+    end
+    local care = (plant.health + (plant.fertilizer or 0)) / 200
+    return it.roundPurity(purity + p.gainMin + (p.gainMax - p.gainMin) * care)
+end
+
+-- Genética nova (Config.Mutations): semente 100% pura + combinação EXATA de fertilizantes
+local findMutation = function(plant)
+    if (plant.purity or 0) < 100 then return nil end
+    local log = plant.fertilizerLog or {}
+    for _, mutation in ipairs(Config.Mutations[plant.type] or {}) do
+        local match = true
+        for item, data in pairs(Config.Items) do
+            if data.fertilizer ~= 0 and (log[item] or 0) ~= (mutation.fertilizers[item] or 0) then
+                match = false
+                break
+            end
+        end
+        if match then return mutation.seed end
+    end
+end
 
 RegisterNetEvent('it-drugs:server:harvestPlant', function(plantId)
     local src = source
@@ -430,22 +474,19 @@ RegisterNetEvent('it-drugs:server:harvestPlant', function(plantId)
     if plants[entity].budsHarvested then return end -- já colheu os brotos dessa planta, não dá pra repetir
 
     if DoesEntityExist(entity) then
-        local fertilizerFactor = (plants[entity].fertilizer or 0) / 100 -- 0 = colhe o mínimo, 100 = colhe o máximo
+        local plant = plants[entity]
+        giveProducts(src, plant, 1)
 
-        for k, v in pairs(Config.Plants[plants[entity].type].products) do
-            local product = k
-            local minAmount = v.min
-            local maxAmount = v.max
-            local amount = math.floor(minAmount + ((maxAmount - minAmount) * fertilizerFactor) + 0.5)
-            it.giveItem(src, product, amount)
+        local seedConfig = Config.Plants[plant.type].seed
+        if math.random(1, 100) <= seedConfig.chance then
+            local seedMeta = it.usesPurity(plant.type) and { purity = nextSeedPurity(plant) } or nil
+            it.giveItem(src, plant.type, math.random(seedConfig.min, seedConfig.max), seedMeta)
         end
-        if math.random(1, 100) <= Config.Plants[plants[entity].type].seed.chance then
-            local seed = plants[entity].type
 
-            if Config.Plants[plants[entity].type].seed.max > 1 then
-                local seedAmount = math.random(Config.Plants[seed].seed.min, Config.Plants[seed].seed.max)
-                it.giveItem(src, seed, seedAmount)
-            end
+        local mutation = findMutation(plant)
+        if mutation then
+            it.giveItem(src, mutation, 1, { purity = Config.Purity.mutationPurity })
+            ShowNotification(src, _U('NOTIFICATION__NEW__GENETIC'):format(Config.Plants[mutation].label), 'success')
         end
 
         -- A planta NÃO é mais destruída aqui (era o comportamento antigo) - só marca que os brotos
@@ -494,15 +535,8 @@ RegisterNetEvent('it-drugs:server:cutWholePlant', function(plantId)
     if not plants[entity].budsHarvested then return end -- precisa ter colhido os brotos primeiro
 
     if DoesEntityExist(entity) then
-        local fertilizerFactor = (plants[entity].fertilizer or 0) / 100
-        local mult = Config.HarvestMinigame.wholePlantMultiplier
-
-        for k, v in pairs(Config.Plants[plants[entity].type].products) do
-            local minAmount = v.min * mult
-            local maxAmount = v.max * mult
-            local amount = math.floor(minAmount + ((maxAmount - minAmount) * fertilizerFactor) + 0.5)
-            it.giveItem(src, k, amount)
-        end
+        -- Cortar só tira a planta (não dá nada); no vaso a terra fica, mas precisa adubar pra plantar de novo
+        if plants[entity].potId and SetPotSoilAfterCut then SetPotSoilAfterCut(plants[entity].potId) end
 
         DeleteEntity(entity)
         SendToWebhook(src, 'plant', 'cutWholePlant', plants[entity])
@@ -576,8 +610,14 @@ RegisterNetEvent('it-drugs:server:plantTakeCare', function(entity, item)
                 plants[entity].fertilizer = currentFertilizer + itemStrength
             end
 
-            MySQL.update('UPDATE drug_plants SET fertilizer = (:fertilizer) WHERE id = (:id)', {
+            -- Conta cada fertilizante aplicado - a combinação decide a genética nova (Config.Mutations)
+            local log = plants[entity].fertilizerLog or {}
+            log[item] = (log[item] or 0) + 1
+            plants[entity].fertilizerLog = log
+
+            MySQL.update('UPDATE drug_plants SET fertilizer = (:fertilizer), fertilizerLog = (:fertilizerLog) WHERE id = (:id)', {
                 ['fertilizer'] = json.encode(plants[entity].fertilizer),
+                ['fertilizerLog'] = json.encode(log),
                 ['id'] = plants[entity].id,
             })
             SendToWebhook(src, 'plant', 'fertilize', plants[entity])
@@ -645,9 +685,16 @@ RegisterNetEvent('it-drugs:server:createNewPlant', function(coords, plantItem, z
     local plantInfos = Config.Plants[plantItem]
 
     if not player then return end
-    if #(GetEntityCoords(GetPlayerPed(src)) - coords) > Config.rayCastingDistance + 10 then return end
+    if #(GetEntityCoords(GetPlayerPed(src)) - coords) > Config.PlaceMaxDistance + 2.0 then return end -- longe do boneco (Config.PlaceMaxDistance + folga)
+
+    if Config.PlantTool and not it.hasItem(src, Config.PlantTool, 1) then -- plantar no chão precisa da pá (não gasta)
+        ShowNotification(src, _U('NOTIFICATION__NO__PLANT__TOOL'), 'error')
+        return
+    end
 
     if it.removeItem(src, plantItem, 1, metadata) then
+        -- removeItem com o metadata já confere que a semente com essa pureza existe de verdade
+        local purity = it.roundPurity(metadata and metadata.purity or Config.Purity.default)
         local modelHash = GetHashKey(Config.PlantTypes[plantInfos.plantType][1][1])
         local plant = CreateObjectNoOffset(modelHash, coords.x, coords.y, coords.z + Config.PlantTypes[plantInfos.plantType][1][2], true, true, false)
         FreezeEntityPosition(plant, true)
@@ -665,9 +712,9 @@ RegisterNetEvent('it-drugs:server:createNewPlant', function(coords, plantItem, z
         sunlight = tonumber(sunlight) or Config.DefaultSunlight
         -- Nasce com addedLight = 0 (escuro) mesmo já tendo lâmpada por perto - a luz sobe aos
         -- poucos (Config.LampLightRampStep) em updatePlantNeeds até chegar em targetAddedLight.
-        local targetAddedLight = GetLamps and calculateAddedLight(coords, GetLamps()) or 0
+        local targetAddedLight = GetPoweredLamps and calculateAddedLight(coords, GetPoweredLamps()) or 0
 
-        MySQL.insert('INSERT INTO `drug_plants` (owner, coords, time, type, water, fertilizer, health, growtime, growth, sunlight, addedLight) VALUES (:owner, :coords, :time, :type, :water, :fertilizer, :health, :growtime, :growth, :sunlight, :addedLight)', {
+        MySQL.insert('INSERT INTO `drug_plants` (owner, coords, time, type, water, fertilizer, health, growtime, growth, sunlight, addedLight, purity) VALUES (:owner, :coords, :time, :type, :water, :fertilizer, :health, :growtime, :growth, :sunlight, :addedLight, :purity)', {
             ['owner'] = owner,
             ['coords'] = json.encode(coords),
             ['time'] = time,
@@ -679,6 +726,7 @@ RegisterNetEvent('it-drugs:server:createNewPlant', function(coords, plantItem, z
             ['growth'] = 0.0,
             ['sunlight'] = sunlight,
             ['addedLight'] = 0.0,
+            ['purity'] = purity,
         }, function(id)
             plants[plant] = {
                 id = id,
@@ -696,7 +744,9 @@ RegisterNetEvent('it-drugs:server:createNewPlant', function(coords, plantItem, z
                 targetAddedLight = targetAddedLight,
                 entity = plant,
                 stage = 1,
-                budsHarvested = false
+                budsHarvested = false,
+                purity = purity,
+                fertilizerLog = {}
             }
             TriggerClientEvent('it-drugs:client:syncPlantList', -1)
             SendToWebhook(src, 'plant', 'plant', plants[plant])
@@ -720,9 +770,19 @@ RegisterNetEvent('it-drugs:server:plantInPot', function(args)
     if PlantExistsInPot(potData.id) then return end
     if #(GetEntityCoords(GetPlayerPed(src)) - potData.coords) > 10 then return end
     if not potData.hasSoil then return end
-    if not it.hasItem(src, seedItem, 1) then return end
+    if potData.burnt then -- planta queimada antes: terra imprópria, tem que remover e pôr terra nova
+        ShowNotification(src, _U('NOTIFICATION__POT__SOIL__BURNT'), 'error')
+        return
+    end
+    if potData.needsFertilizer then -- planta cortada antes: tem que adubar a terra primeiro
+        ShowNotification(src, _U('NOTIFICATION__POT__NEEDS__FERTILIZER'), 'error')
+        return
+    end
 
-    if it.removeItem(src, seedItem, 1) then
+    -- O menu do vaso escolhe a variedade, não o slot - planta a semente mais pura que o jogador tiver
+    local purity = it.takeItemWithPurity(src, seedItem, 1)
+    if purity then
+        purity = it.roundPurity(purity)
         local potConfig = Config.Pots[potData.item]
         local heightOffset = ((potConfig and potConfig.heightOffset) or 0) + ((potConfig and potConfig.plantHeightOffset) or 0) -- altura do vaso + ajuste fino só da planta
         local coords = vector3(potData.coords.x, potData.coords.y, potData.coords.z + heightOffset)
@@ -737,9 +797,9 @@ RegisterNetEvent('it-drugs:server:plantInPot', function(args)
         local sunlight = tonumber(args.sunlight) or Config.DefaultSunlight
         -- Nasce com addedLight = 0 (escuro) mesmo já tendo lâmpada por perto - a luz sobe aos
         -- poucos (Config.LampLightRampStep) em updatePlantNeeds até chegar em targetAddedLight.
-        local targetAddedLight = GetLamps and calculateAddedLight(coords, GetLamps()) or 0
+        local targetAddedLight = GetPoweredLamps and calculateAddedLight(coords, GetPoweredLamps()) or 0
 
-        MySQL.insert('INSERT INTO `drug_plants` (owner, coords, time, type, water, fertilizer, health, growtime, growth, sunlight, addedLight, potId) VALUES (:owner, :coords, :time, :type, :water, :fertilizer, :health, :growtime, :growth, :sunlight, :addedLight, :potId)', {
+        MySQL.insert('INSERT INTO `drug_plants` (owner, coords, time, type, water, fertilizer, health, growtime, growth, sunlight, addedLight, potId, purity) VALUES (:owner, :coords, :time, :type, :water, :fertilizer, :health, :growtime, :growth, :sunlight, :addedLight, :potId, :purity)', {
             ['owner'] = owner,
             ['coords'] = json.encode(coords),
             ['time'] = time,
@@ -752,6 +812,7 @@ RegisterNetEvent('it-drugs:server:plantInPot', function(args)
             ['sunlight'] = sunlight,
             ['addedLight'] = 0.0,
             ['potId'] = potData.id,
+            ['purity'] = purity,
         }, function(id)
             plants[plant] = {
                 id = id,
@@ -770,7 +831,9 @@ RegisterNetEvent('it-drugs:server:plantInPot', function(args)
                 potId = potData.id,
                 entity = plant,
                 stage = 1,
-                budsHarvested = false
+                budsHarvested = false,
+                purity = purity,
+                fertilizerLog = {}
             }
             TriggerClientEvent('it-drugs:client:syncPlantList', -1)
             SendToWebhook(src, 'plant', 'plant', plants[plant])
@@ -799,6 +862,7 @@ function GetPlantInPot(potId)
                 sunlight = plant.sunlight or Config.DefaultSunlight,
                 addedLight = plant.addedLight or 0,
                 budsHarvested = plant.budsHarvested or false,
+                purity = plant.purity,
                 entity = entity, -- handle do SERVER (só serve pra ecoar de volta em TriggerServerEvent, nunca usar em native local no client)
                 netId = NetworkGetNetworkIdFromEntity(entity) -- pra client resolver o handle LOCAL de verdade quando precisar (ex.: câmera do minigame de colheita)
             }
@@ -866,6 +930,7 @@ lib.callback.register('it-drugs:server:getPlantData', function(source, netId)
         sunlight = plants[entity].sunlight or Config.DefaultSunlight,
         addedLight = plants[entity].addedLight or 0,
         budsHarvested = plants[entity].budsHarvested or false,
+        purity = plants[entity].purity,
         entity = entity, -- handle do SERVER (só serve pra ecoar de volta em TriggerServerEvent, nunca usar em native local no client)
         netId = netId -- já veio como parâmetro - client resolve o handle LOCAL de verdade a partir dele quando precisar
     }
@@ -892,6 +957,7 @@ lib.callback.register('it-drugs:server:getPlantDataWithId', function(source, pla
                 sunlight = v.sunlight or Config.DefaultSunlight,
                 addedLight = v.addedLight or 0,
                 budsHarvested = v.budsHarvested or false,
+                purity = v.purity,
                 entity = entity, -- handle do SERVER (só serve pra ecoar de volta em TriggerServerEvent, nunca usar em native local no client)
                 netId = NetworkGetNetworkIdFromEntity(entity) -- pra client resolver o handle LOCAL de verdade quando precisar (ex.: câmera do minigame de colheita)
             }

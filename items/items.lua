@@ -234,7 +234,7 @@ terra = {
 
 secador = {
     name = 'secador',
-    label = 'Varal de Secagem',
+    label = 'Rede de Secagem',
     weight = 2000,
     type = 'item',
     image = 'secador.png',

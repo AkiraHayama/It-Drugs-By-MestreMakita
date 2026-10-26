@@ -197,7 +197,7 @@
 },
 
 ["secador"] = {
-    label = "Varal de Secagem",
+    label = "Rede de Secagem",
     weight = 2000,
     stack = true,
     close = true,

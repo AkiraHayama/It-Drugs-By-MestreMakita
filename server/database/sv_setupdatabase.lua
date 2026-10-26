@@ -98,6 +98,46 @@ local function setupDatabase()
         end
     end
 
+    if Config.EnableGenerators then
+        local drugGeneratorsFile = LoadResourceFile(GetCurrentResourceName(), 'server/database/drug_generators.sql')
+
+        local generatorsStatements = {}
+        for line in drugGeneratorsFile:gsub("\r\n", "\n"):gsub("\n\n", "\n"):gmatch("[^\n]+") do
+            table.insert(generatorsStatements, line)
+        end
+
+        for i = 1, #generatorsStatements do
+            MySQL.rawExecute(generatorsStatements[i], {}, function(response)
+                if response then
+                    if Config.Debug then lib.print.info('Executed SQL Statment ' .. generatorsStatements[i]) end
+                else
+                    lib.print.error('Failed to execute SQL statement: ' .. generatorsStatements[i])
+                    return
+                end
+            end)
+        end
+    end
+
+    if Config.EnableFans then
+        local drugFansFile = LoadResourceFile(GetCurrentResourceName(), 'server/database/drug_fans.sql')
+
+        local fansStatements = {}
+        for line in drugFansFile:gsub("\r\n", "\n"):gsub("\n\n", "\n"):gmatch("[^\n]+") do
+            table.insert(fansStatements, line)
+        end
+
+        for i = 1, #fansStatements do
+            MySQL.rawExecute(fansStatements[i], {}, function(response)
+                if response then
+                    if Config.Debug then lib.print.info('Executed SQL Statment ' .. fansStatements[i]) end
+                else
+                    lib.print.error('Failed to execute SQL statement: ' .. fansStatements[i])
+                    return
+                end
+            end)
+        end
+    end
+
     if Config.EnableWaterPoints then
         local drugWaterPointsFile = LoadResourceFile(GetCurrentResourceName(), 'server/database/drug_waterpoints.sql')
 
