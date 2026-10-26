@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>html, body { background: transparent; margin: 0; }</style>
+</head>
+<body>
+    <script>
+        // Sons do ventilador do it-drugs (client.lua repassa o que o it-drugs manda): volume do loop (fanVolume)
+        // e o clique de ligar/desligar (fanClick). O vento só começa depois que o clique termina.
+        const somBotao = new Audio('fan_click.ogg');
+        const somVento = new Audio('fan.ogg');
+        somVento.loop = true;
+
+        const falhou = (nome) => (e) => console.error('[itdrugs_som] ' + nome + ' falhou: ' + e);
+        const clamp = (v) => Math.max(0, Math.min(1, v));
+        const tocandoBotao = () => !somBotao.paused && !somBotao.ended;
+
+        const tocarVento = () => {
+            if (somVento.volume === 0 || !somVento.paused) return;
+            somVento.play().catch(falhou('som do ventilador'));
+        };
+
+        window.addEventListener('message', (event) => {
+            const data = event.data;
+            if (data.type === 'fanVolume') {
+                somVento.volume = clamp(data.volume);
+                if (somVento.volume === 0) {
+                    somVento.pause();
+                } else if (tocandoBotao()) {
+                    somBotao.onended = tocarVento; // espera o clique terminar
+                } else {
+                    tocarVento();
+                }
+            } else if (data.type === 'fanClick') {
+                somBotao.volume = clamp(data.volume);
+                somBotao.currentTime = 0;
+                somBotao.play().catch(falhou('clique'));
+            }
+        });
+    </script>
+</body>
+</html>

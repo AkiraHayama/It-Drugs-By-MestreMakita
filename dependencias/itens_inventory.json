@@ -1,0 +1,640 @@
+{
+  "items": {
+    "weed_lemonhaze_seed": {
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      },
+      "label": "Semente de Lemon Haze"
+    },
+    "coca_seed": {
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "weed_processing_table": {
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "cocaine_processing_table": {
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "joint": {
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "weed_lemonhaze_dried": {
+      "label": "Lemon Haze Seca",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_lemonhaze_curada": {
+      "label": "Lemon Haze Curada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "tijolo_lemonhaze": {
+      "label": "Tijolo de Lemon Haze",
+      "weight": 200,
+      "stack": true,
+      "close": true
+    },
+    "weed_lemonhaze_dichavada": {
+      "label": "Lemon Haze Dichavada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_lemonhaze_saquinho": {
+      "label": "Saquinho de Lemon Haze",
+      "weight": 100,
+      "stack": true,
+      "close": true
+    },
+    "ogkush_seed": {
+      "label": "Semente de OG Kush",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "weed_ogkush": {
+      "label": "OG Kush",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_ogkush_dried": {
+      "label": "OG Kush Seca",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_ogkush_curada": {
+      "label": "OG Kush Curada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "tijolo_ogkush": {
+      "label": "Tijolo de OG Kush",
+      "weight": 200,
+      "stack": true,
+      "close": true
+    },
+    "weed_ogkush_dichavada": {
+      "label": "OG Kush Dichavada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_ogkush_saquinho": {
+      "label": "Saquinho de OG Kush",
+      "weight": 100,
+      "stack": true,
+      "close": true
+    },
+    "nlights_seed": {
+      "label": "Semente de Northern Lights",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "weed_nlights": {
+      "label": "Northern Lights",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_nlights_dried": {
+      "label": "Northern Lights Seca",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_nlights_curada": {
+      "label": "Northern Lights Curada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "tijolo_nlights": {
+      "label": "Tijolo de Northern Lights",
+      "weight": 200,
+      "stack": true,
+      "close": true
+    },
+    "weed_nlights_dichavada": {
+      "label": "Northern Lights Dichavada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_nlights_saquinho": {
+      "label": "Saquinho de Northern Lights",
+      "weight": 100,
+      "stack": true,
+      "close": true
+    },
+    "dosidos_seed": {
+      "label": "Semente de Do-Si-Dos",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "weed_dosidos": {
+      "label": "Do-Si-Dos",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_dosidos_dried": {
+      "label": "Do-Si-Dos Seca",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_dosidos_curada": {
+      "label": "Do-Si-Dos Curada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "tijolo_dosidos": {
+      "label": "Tijolo de Do-Si-Dos",
+      "weight": 200,
+      "stack": true,
+      "close": true
+    },
+    "weed_dosidos_dichavada": {
+      "label": "Do-Si-Dos Dichavada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_dosidos_saquinho": {
+      "label": "Saquinho de Do-Si-Dos",
+      "weight": 100,
+      "stack": true,
+      "close": true
+    },
+    "acapulcogold_seed": {
+      "label": "Semente de Acapulco Gold",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "weed_acapulcogold": {
+      "label": "Acapulco Gold",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_acapulcogold_dried": {
+      "label": "Acapulco Gold Seca",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_acapulcogold_curada": {
+      "label": "Acapulco Gold Curada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "tijolo_acapulcogold": {
+      "label": "Tijolo de Acapulco Gold",
+      "weight": 200,
+      "stack": true,
+      "close": true
+    },
+    "weed_acapulcogold_dichavada": {
+      "label": "Acapulco Gold Dichavada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_acapulcogold_saquinho": {
+      "label": "Saquinho de Acapulco Gold",
+      "weight": 100,
+      "stack": true,
+      "close": true
+    },
+    "colombiangold_seed": {
+      "label": "Semente de Colombian Gold",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "weed_colombiangold": {
+      "label": "Colombian Gold",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_colombiangold_dried": {
+      "label": "Colombian Gold Seca",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_colombiangold_curada": {
+      "label": "Colombian Gold Curada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "tijolo_colombiangold": {
+      "label": "Tijolo de Colombian Gold",
+      "weight": 200,
+      "stack": true,
+      "close": true
+    },
+    "weed_colombiangold_dichavada": {
+      "label": "Colombian Gold Dichavada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_colombiangold_saquinho": {
+      "label": "Saquinho de Colombian Gold",
+      "weight": 100,
+      "stack": true,
+      "close": true
+    },
+    "limegreenskunk_seed": {
+      "label": "Semente de Lime Green Skunk",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "weed_limegreenskunk": {
+      "label": "Lime Green Skunk",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_limegreenskunk_dried": {
+      "label": "Lime Green Skunk Seca",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_limegreenskunk_curada": {
+      "label": "Lime Green Skunk Curada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "tijolo_limegreenskunk": {
+      "label": "Tijolo de Lime Green Skunk",
+      "weight": 200,
+      "stack": true,
+      "close": true
+    },
+    "weed_limegreenskunk_dichavada": {
+      "label": "Lime Green Skunk Dichavada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_limegreenskunk_saquinho": {
+      "label": "Saquinho de Lime Green Skunk",
+      "weight": 100,
+      "stack": true,
+      "close": true
+    },
+    "rainbowbelts_seed": {
+      "label": "Semente de Rainbow Belts",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "weed_rainbowbelts": {
+      "label": "Rainbow Belts",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_rainbowbelts_dried": {
+      "label": "Rainbow Belts Seca",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_rainbowbelts_curada": {
+      "label": "Rainbow Belts Curada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "tijolo_rainbowbelts": {
+      "label": "Tijolo de Rainbow Belts",
+      "weight": 200,
+      "stack": true,
+      "close": true
+    },
+    "weed_rainbowbelts_dichavada": {
+      "label": "Rainbow Belts Dichavada",
+      "weight": 20,
+      "stack": true,
+      "close": false
+    },
+    "weed_rainbowbelts_saquinho": {
+      "label": "Saquinho de Rainbow Belts",
+      "weight": 100,
+      "stack": true,
+      "close": true
+    },
+    "cocaine": {
+      "label": "Cocaína Processada",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "haxixe": {
+      "label": "Haxixe",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "prensa": {
+      "label": "Prensa",
+      "weight": 1000,
+      "stack": false,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "portable_lamp": {
+      "label": "Lâmpada Portátil",
+      "weight": 1500,
+      "stack": false,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "reflector_lamp": {
+      "label": "Lâmpada Portátil (Refletora)",
+      "weight": 1500,
+      "stack": false,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "vaso": {
+      "label": "Vaso de Plantio",
+      "weight": 2000,
+      "stack": true,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "secador": {
+      "label": "Rede de Secagem",
+      "weight": 2000,
+      "stack": true,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "ventilador": {
+      "label": "Ventilador",
+      "weight": 3000,
+      "stack": false,
+      "close": true,
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "terra": {
+      "label": "Saco de Terra",
+      "weight": 1000,
+      "stack": true,
+      "close": false
+    },
+    "foice": {
+      "label": "Foice",
+      "weight": 1500,
+      "stack": false,
+      "close": false
+    },
+    "bubble_bag": {
+      "label": "Bubble Bag",
+      "weight": 800,
+      "stack": false,
+      "close": false
+    },
+    "gelo_seco": {
+      "label": "Gelo Seco",
+      "weight": 300,
+      "stack": true,
+      "close": false
+    },
+    "dichavador": {
+      "label": "Dichavador",
+      "weight": 300,
+      "stack": false,
+      "close": false
+    },
+    "gerador": {
+      "label": "Gerador",
+      "weight": 20000,
+      "stack": false,
+      "close": true,
+      "description": "Gerador a gasolina pra ligar ventilador e lâmpada (até 5). Abastece com galão.",
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "extensao": {
+      "label": "Extensão",
+      "weight": 500,
+      "stack": true,
+      "close": true,
+      "description": "Liga um ventilador ou lâmpada no gerador (até 10 m).",
+      "client": {
+        "event": "it-drugs:ox:useItem"
+      }
+    },
+    "weed_lemonhaze": {
+      "label": "Lemon Haze"
+    },
+    "plastico_filme": {
+      "label": "Plástico Filme",
+      "weight": 400,
+      "stack": true,
+      "close": false,
+      "description": "Rolo de plástico filme: embala 10 cubos de prensado na bancada."
+    },
+    "ziplock": {
+      "label": "Zip Lock",
+      "weight": 10,
+      "stack": true,
+      "close": false,
+      "description": "Saquinho zip lock: ensaca 1 dichavada na bancada (camarão)."
+    },
+    "balanca": {
+      "label": "Balança de Precisão",
+      "weight": 500,
+      "stack": false,
+      "close": false,
+      "description": "Balança pra pesar os cubos de prensado na bancada (ferramenta, não gasta)."
+    },
+    "cubo_lemonhaze": {
+      "label": "Cubo de Prensado de Lemon Haze",
+      "weight": 20,
+      "stack": true,
+      "close": false,
+      "description": "Pedaço cortado do tijolo de Lemon Haze."
+    },
+    "cubo_lemonhaze_embalado": {
+      "label": "Prensado Embalado de Lemon Haze",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "description": "Cubo de prensado embalado no plástico filme, pronto pra vender."
+    },
+    "cubo_ogkush": {
+      "label": "Cubo de Prensado de OG Kush",
+      "weight": 20,
+      "stack": true,
+      "close": false,
+      "description": "Pedaço cortado do tijolo de OG Kush."
+    },
+    "cubo_ogkush_embalado": {
+      "label": "Prensado Embalado de OG Kush",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "description": "Cubo de prensado embalado no plástico filme, pronto pra vender."
+    },
+    "cubo_nlights": {
+      "label": "Cubo de Prensado de Northern Lights",
+      "weight": 20,
+      "stack": true,
+      "close": false,
+      "description": "Pedaço cortado do tijolo de Northern Lights."
+    },
+    "cubo_nlights_embalado": {
+      "label": "Prensado Embalado de Northern Lights",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "description": "Cubo de prensado embalado no plástico filme, pronto pra vender."
+    },
+    "cubo_dosidos": {
+      "label": "Cubo de Prensado de Do-Si-Dos",
+      "weight": 20,
+      "stack": true,
+      "close": false,
+      "description": "Pedaço cortado do tijolo de Do-Si-Dos."
+    },
+    "cubo_dosidos_embalado": {
+      "label": "Prensado Embalado de Do-Si-Dos",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "description": "Cubo de prensado embalado no plástico filme, pronto pra vender."
+    },
+    "cubo_acapulcogold": {
+      "label": "Cubo de Prensado de Acapulco Gold",
+      "weight": 20,
+      "stack": true,
+      "close": false,
+      "description": "Pedaço cortado do tijolo de Acapulco Gold."
+    },
+    "cubo_acapulcogold_embalado": {
+      "label": "Prensado Embalado de Acapulco Gold",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "description": "Cubo de prensado embalado no plástico filme, pronto pra vender."
+    },
+    "cubo_colombiangold": {
+      "label": "Cubo de Prensado de Colombian Gold",
+      "weight": 20,
+      "stack": true,
+      "close": false,
+      "description": "Pedaço cortado do tijolo de Colombian Gold."
+    },
+    "cubo_colombiangold_embalado": {
+      "label": "Prensado Embalado de Colombian Gold",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "description": "Cubo de prensado embalado no plástico filme, pronto pra vender."
+    },
+    "cubo_limegreenskunk": {
+      "label": "Cubo de Prensado de Lime Green Skunk",
+      "weight": 20,
+      "stack": true,
+      "close": false,
+      "description": "Pedaço cortado do tijolo de Lime Green Skunk."
+    },
+    "cubo_limegreenskunk_embalado": {
+      "label": "Prensado Embalado de Lime Green Skunk",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "description": "Cubo de prensado embalado no plástico filme, pronto pra vender."
+    },
+    "cubo_rainbowbelts": {
+      "label": "Cubo de Prensado de Rainbow Belts",
+      "weight": 20,
+      "stack": true,
+      "close": false,
+      "description": "Pedaço cortado do tijolo de Rainbow Belts."
+    },
+    "cubo_rainbowbelts_embalado": {
+      "label": "Prensado Embalado de Rainbow Belts",
+      "weight": 20,
+      "stack": true,
+      "close": true,
+      "description": "Cubo de prensado embalado no plástico filme, pronto pra vender."
+    },
+    "pa_jardim": {
+      "label": "Pá de Jardim",
+      "weight": 600,
+      "stack": false,
+      "close": false,
+      "description": "Pra cavucar a terra e plantar semente direto no chão. Não gasta."
+    }
+  }
+}

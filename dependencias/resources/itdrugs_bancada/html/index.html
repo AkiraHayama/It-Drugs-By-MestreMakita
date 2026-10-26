@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<style>
+    :root {
+        --panel: rgba(14, 17, 15, 0.82);
+        --line: rgba(255, 255, 255, 0.10);
+        --text: #e9efe9;
+        --muted: #9aa69c;
+        --green: #6fcf7c;
+        --green-glow: rgba(111, 207, 124, 0.35);
+    }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent;
+        font-family: 'Segoe UI', Roboto, Arial, sans-serif; color: var(--text); user-select: none; }
+    #root { display: none; position: fixed; inset: 0; cursor: default; }
+
+    /* dicas no topo */
+    #hints { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px;
+        flex-wrap: wrap; justify-content: center; max-width: 90vw; }
+    .hint { padding: 6px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line);
+        font-size: 12.5px; color: var(--muted); white-space: nowrap; backdrop-filter: blur(4px); }
+    .hint b { color: var(--text); font-weight: 600; }
+
+    /* barra de itens */
+    #dock { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); padding: 10px 12px 12px;
+        border-radius: 14px; background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(6px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
+    #dock .title { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+        margin: 0 2px 8px; }
+    #bar { display: flex; gap: 8px; }
+    #empty { display: none; padding: 18px 26px; color: var(--muted); font-size: 13px; }
+    .slot { position: relative; width: 78px; height: 78px; border-radius: 10px; background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--line); cursor: grab; transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s; }
+    .slot:hover { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-glow); transform: translateY(-2px); }
+    .slot.off { opacity: 0.4; cursor: default; }
+    .slot.off:hover { border-color: var(--line); box-shadow: none; transform: none; }
+    .slot img { position: absolute; left: 9px; top: 7px; width: 60px; height: 50px; object-fit: contain; pointer-events: none;
+        filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
+    .slot .count { position: absolute; top: 4px; right: 6px; font-size: 12px; font-weight: 700; }
+    .slot .name { position: absolute; bottom: 4px; left: 4px; right: 4px; font-size: 10px; color: var(--muted);
+        text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .slot .tag { position: absolute; top: 4px; left: 5px; font-size: 9px; padding: 1px 5px; border-radius: 6px;
+        background: rgba(111, 207, 124, 0.2); color: var(--green); }
+    .slot.noimg .name { top: 20px; bottom: 6px; display: flex; align-items: center; justify-content: center;
+        white-space: normal; font-size: 12px; color: var(--text); }
+
+    /* caixinha de nome e quantidade perto do mouse */
+    #tip { display: none; position: fixed; padding: 7px 11px; border-radius: 8px; background: var(--panel);
+        border: 1px solid var(--line); font-size: 13px; pointer-events: none; white-space: nowrap;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); }
+    #tip .qty { color: var(--green); font-weight: 700; margin-left: 8px; }
+
+    #ghost { display: none; position: fixed; width: 60px; height: 60px; object-fit: contain; pointer-events: none;
+        opacity: 0.9; transform: translate(-50%, -50%); filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.6)); }
+</style>
+</head>
+<body>
+<div id="root">
+    <div id="hints"></div>
+    <div id="dock">
+        <div class="title">Bancada</div>
+        <div id="bar"></div>
+        <div id="empty">Nada pra colocar na mesa</div>
+    </div>
+    <div id="tip"></div>
+    <img id="ghost" alt="">
+</div>
+<script>
+    const root = document.getElementById('root');
+    const bar = document.getElementById('bar');
+    const empty = document.getElementById('empty');
+    const hints = document.getElementById('hints');
+    const tip = document.getElementById('tip');
+    const ghost = document.getElementById('ghost');
+    let dragItem = null; // item sendo arrastado da barra
+    let moveQueued = null; // manda no máximo 1 'move' por frame
+    let slotInfo = null, propInfo = null; // caixinha: mouse em cima de um quadradinho / de um item da mesa
+    let mouse = { x: 0, y: 0 };
+
+    const post = (data) => fetch(`https://${GetParentResourceName()}/mouse`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    }).catch(() => {});
+    const pos = (e) => ({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight });
+    const icon = (name) => `nui://ox_inventory/web/images/${name}.png`;
+
+    function drawTip() {
+        const info = dragItem ? null : (slotInfo || propInfo);
+        if (!info) { tip.style.display = 'none'; return; }
+        tip.replaceChildren();
+        const label = document.createElement('span');
+        label.textContent = info.label;
+        const qty = document.createElement('span');
+        qty.className = 'qty';
+        qty.textContent = `x${info.count}`;
+        tip.append(label, qty);
+        tip.style.display = 'block';
+        const w = tip.offsetWidth, h = tip.offsetHeight;
+        tip.style.left = Math.min(mouse.x + 16, window.innerWidth - w - 8) + 'px';
+        tip.style.top = Math.max(mouse.y - h - 12, 8) + 'px';
+    }
+
+    function render(items) {
+        bar.replaceChildren();
+        empty.style.display = items.length ? 'none' : 'block';
+        for (const item of items) {
+            const slot = document.createElement('div');
+            slot.className = 'slot' + (item.disabled ? ' off' : '');
+            const img = document.createElement('img');
+            img.src = icon(item.name);
+            img.onerror = () => { // sem ícone: tenta o reserva, senão mostra o nome grande
+                if (item.fallback && !img.src.endsWith(`/${item.fallback}.png`)) {
+                    img.src = icon(item.fallback);
+                } else {
+                    img.style.visibility = 'hidden';
+                    slot.classList.add('noimg');
+                }
+            };
+            const count = document.createElement('span');
+            count.className = 'count';
+            count.textContent = item.count;
+            const name = document.createElement('span');
+            name.className = 'name';
+            name.textContent = item.label;
+            slot.append(img, count, name);
+            if (item.disabled) {
+                const tag = document.createElement('span');
+                tag.className = 'tag';
+                tag.textContent = 'na mesa';
+                slot.append(tag);
+            }
+            slot.addEventListener('mouseenter', () => { slotInfo = item; drawTip(); });
+            slot.addEventListener('mouseleave', () => { slotInfo = null; drawTip(); });
+            if (!item.disabled) {
+                slot.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    if (e.button !== 0) return;
+                    dragItem = item.name;
+                    post({ type: 'dragitem', item: item.name }); // o jogo acende o espaço desse item na mesa
+                    ghost.src = img.src;
+                    ghost.style.display = img.style.visibility === 'hidden' ? 'none' : 'block';
+                    ghost.style.left = e.clientX + 'px';
+                    ghost.style.top = e.clientY + 'px';
+                    drawTip();
+                });
+            }
+            bar.append(slot);
+        }
+    }
+
+    window.addEventListener('message', (e) => {
+        const d = e.data;
+        if (d.type === 'open') {
+            hints.replaceChildren();
+            for (const text of (d.help || '').split('|').filter(Boolean)) {
+                const hint = document.createElement('div');
+                hint.className = 'hint';
+                const [key, rest] = text.split(/:(.*)/);
+                if (rest !== undefined) {
+                    const b = document.createElement('b');
+                    b.textContent = key;
+                    hint.append(b, document.createTextNode(':' + rest));
+                } else {
+                    hint.textContent = text;
+                }
+                hints.append(hint);
+            }
+            slotInfo = propInfo = null;
+            render(d.items || []);
+            root.style.display = 'block';
+        } else if (d.type === 'items') {
+            slotInfo = null;
+            render(d.items || []);
+            drawTip();
+        } else if (d.type === 'hover') {
+            propInfo = d.info || null;
+            drawTip();
+        } else if (d.type === 'close') {
+            root.style.display = 'none';
+            dragItem = slotInfo = propInfo = null;
+            ghost.style.display = 'none';
+            tip.style.display = 'none';
+        }
+    });
+
+    root.addEventListener('mousedown', (e) => {
+        if (e.button === 2) return post({ type: 'remove', ...pos(e) });
+        if (e.button === 0) post({ type: 'down', ...pos(e) });
+    });
+    window.addEventListener('mousemove', (e) => {
+        mouse = { x: e.clientX, y: e.clientY };
+        if (dragItem) {
+            ghost.style.left = e.clientX + 'px';
+            ghost.style.top = e.clientY + 'px';
+            return;
+        }
+        drawTip();
+        if (!moveQueued) requestAnimationFrame(() => { post({ type: 'move', ...moveQueued }); moveQueued = null; });
+        moveQueued = pos(e);
+    });
+    window.addEventListener('mouseup', (e) => {
+        if (e.button !== 0) return;
+        if (dragItem) {
+            const overDock = document.getElementById('dock').contains(document.elementFromPoint(e.clientX, e.clientY));
+            if (overDock) post({ type: 'dragitem' }); else post({ type: 'drop', item: dragItem, ...pos(e) });
+            dragItem = null;
+            ghost.style.display = 'none';
+            drawTip();
+            return;
+        }
+        post({ type: 'up', ...pos(e) });
+    });
+    window.addEventListener('keydown', (e) => {
+        if (root.style.display === 'block' && (e.key === 'Escape' || e.key === 'Backspace')) post({ type: 'exit' });
+    });
+    window.addEventListener('contextmenu', (e) => e.preventDefault());
+</script>
+</body>
+</html>
