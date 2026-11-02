@@ -118,7 +118,7 @@ RegisterNetEvent('it-drugs:client:showPotMenu', function(potData)
         icon = "hand",
         arrow = true,
         event = "it-drugs:client:takePot",
-        args = { entity = potData.entity }
+        args = { entity = potData.entity, hasSoil = potData.hasSoil }
     })
 
     lib.registerContext({

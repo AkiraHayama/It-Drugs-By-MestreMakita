@@ -183,15 +183,26 @@ local function takeOne(src, item)
     return slot.metadata or {}
 end
 
---- Cabe +amount cubos dessa variedade na mesa? (limite por variedade e quantas variedades cabem)
-local function cubesFit(stock, strain, amount)
-    local current = stock.cubes[strain]
-    if not current then
-        local strainsOnTable = 0
-        for _ in pairs(stock.cubes) do strainsOnTable = strainsOnTable + 1 end
-        if strainsOnTable >= #Config.Bench.pileSlots then return false end
+--- Quantos espaços a pilha ocupa (cada espaço guarda `max`: Config.Bench.maxCubes nos cubos, maxBuds nas buds;
+--- a mesma variedade pode usar vários)
+local function slotsOf(pile, max)
+    return pile and math.max(pile.slots or 1, math.ceil(pile.count / (max or Config.Bench.maxCubes))) or 0
+end
+--- Espaços que as OUTRAS variedades não estão usando (padrão: cubos; buds passa stock.buds, maxBuds e budSlots)
+local function freeSlots(stock, strain, piles, max, slotList)
+    local used = 0
+    for s, pile in pairs(piles or stock.cubes) do
+        if s ~= strain then used = used + slotsOf(pile, max) end
     end
-    return (current and current.count or 0) + amount <= Config.Bench.maxCubes
+    return #(slotList or Config.Bench.pileSlots) - used
+end
+
+--- Cabe +amount cubos dessa variedade na mesa? Devolve quantos espaços ela passa a ocupar (pega espaço livre se precisar)
+local function cubesFit(stock, strain, amount)
+    local pile = stock.cubes[strain]
+    local need = math.max(slotsOf(pile), math.ceil(((pile and pile.count or 0) + amount) / Config.Bench.maxCubes), 1)
+    if need > freeSlots(stock, strain) then return end
+    return need
 end
 
 --- Junta numa pilha { count, purity } (pureza = média ponderada); devolve a pilha
@@ -232,8 +243,9 @@ local function benchTable(src, entity)
 end
 
 -- Soltou cubos ('cube', variedade) ou zip lock ('film') na mesa: tira do inventário o que couber no limite
--- (Config.Bench.maxCubes por variedade, Config.Bench.maxFilm de zip lock, até #pileSlots variedades na mesa)
-RegisterNetEvent('it-drugs:server:benchStock', function(entity, kind, strain)
+-- (Config.Bench.maxCubes por espaço de cubos, Config.Bench.maxFilm de filme). newSlot = soltou os cubos num espaço
+-- vazio com a variedade já na mesa: ela ganha mais um espaço.
+RegisterNetEvent('it-drugs:server:benchStock', function(entity, kind, strain, newSlot)
     local src = source
     local data = benchTable(src, entity)
     if not data then return end
@@ -252,24 +264,26 @@ RegisterNetEvent('it-drugs:server:benchStock', function(entity, kind, strain)
     elseif kind == 'cube' and Config.WeedStrains[strain] then
         local cube = ('cubo_%s'):format(strain)
         local current = stock.cubes[strain]
-        local amount = math.min(it.getItemCount(src, cube) or 0, Config.Bench.maxCubes - (current and current.count or 0))
-        if amount < 1 or not cubesFit(stock, strain, amount) then return ShowNotification(src, _U('NOTIFICATION__BENCH__LIMIT'), 'error') end
+        local slots = math.max(slotsOf(current) + ((newSlot and current) and 1 or 0), 1)
+        local amount = math.min(it.getItemCount(src, cube) or 0, slots * Config.Bench.maxCubes - (current and current.count or 0))
+        if amount < 1 or slots > freeSlots(stock, strain) then return ShowNotification(src, _U('NOTIFICATION__BENCH__LIMIT'), 'error') end
         local purity = it.takeItemWithPurity(src, cube, amount)
         if not purity then return end
         addCubes(stock, strain, amount, purity)
+        stock.cubes[strain].slots = slots
     elseif kind == 'buds' and Config.WeedStrains[strain] then -- buds curadas do inventário pra pilha da mesa (até o limite)
-        local current = stock.buds[strain]
-        if not current then
-            local strainsOnTable = 0
-            for _ in pairs(stock.buds) do strainsOnTable = strainsOnTable + 1 end
-            if strainsOnTable >= #Config.Bench.budSlots then return ShowNotification(src, _U('NOTIFICATION__BENCH__LIMIT'), 'error') end
-        end
+        -- igual aos cubos: Config.Bench.maxBuds por espaço, a mesma variedade pode ocupar vários (newSlot = espaço vazio)
+        local current, max = stock.buds[strain], Config.Bench.maxBuds
+        local slots = math.max(slotsOf(current, max) + ((newSlot and current) and 1 or 0), 1)
         local cured = ('weed_%s_curada'):format(strain)
-        local amount = math.min(it.getItemCount(src, cured) or 0, Config.Bench.maxBuds - (current and current.count or 0))
-        if amount < 1 then return ShowNotification(src, _U('NOTIFICATION__BENCH__LIMIT'), 'error') end
+        local amount = math.min(it.getItemCount(src, cured) or 0, slots * max - (current and current.count or 0))
+        if amount < 1 or slots > freeSlots(stock, strain, stock.buds, max, Config.Bench.budSlots) then
+            return ShowNotification(src, _U('NOTIFICATION__BENCH__LIMIT'), 'error')
+        end
         local purity = it.takeItemWithPurity(src, cured, amount)
         if not purity then return end
         stock.buds[strain] = mergePile(current, amount, purity)
+        stock.buds[strain].slots = slots
     elseif kind == 'plastic' then -- saquinhos plásticos do inventário pra mesa (até Config.Bench.maxPlastic)
         local amount = math.min(it.getItemCount(src, Config.Bench.grinder.bagItem) or 0, Config.Bench.maxPlastic - (stock.plastic or 0))
         if amount < 1 then return ShowNotification(src, _U('NOTIFICATION__BENCH__LIMIT'), 'error') end
@@ -408,10 +422,12 @@ RegisterNetEvent('it-drugs:server:benchCut', function(entity)
         return ShowNotification(src, _U('NOTIFICATION__MISSING__TOOL'), 'error')
     end
     local strain, amount = stock.brick.strain, Config.Prensado.cubesPerBrick
-    if not cubesFit(stock, strain, amount) then
+    local slots = cubesFit(stock, strain, amount)
+    if not slots then
         return ShowNotification(src, _U('NOTIFICATION__BENCH__LIMIT'), 'error')
     end
     addCubes(stock, strain, amount, stock.brick.purity)
+    stock.cubes[strain].slots = slots
     stock.brick = nil
     saveBench(entity, data)
     SendToWebhook(src, 'table', 'process', data)

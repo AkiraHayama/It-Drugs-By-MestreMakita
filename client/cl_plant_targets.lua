@@ -50,7 +50,8 @@ local registerPlantZone = function(plant)
     -- Centro da zona levantado (Config.PlantTargetZone.heightOffset) pra ficar dentro da folhagem
     -- da planta, longe da colisão sólida do vaso que fica bem perto de plant.coords (ver comentário
     -- em shared/config.lua) - senão a colisão do vaso sempre ganha da mira antes da zona.
-    local zoneCoords = plant.coords + vector3(0, 0, Config.PlantTargetZone.heightOffset)
+    local stageHeight = Config.PlantTargetZone.heightByStage and Config.PlantTargetZone.heightByStage[plant.stage or 1] or 0
+    local zoneCoords = plant.coords + vector3(0, 0, Config.PlantTargetZone.heightOffset + stageHeight)
 
     -- Planta grande (estágio 3) precisa de raio/distância maiores que uma pequena (estágio 1) -
     -- ver Config.PlantTargetZone.radiusByStage/distanceByStage em shared/config.lua.

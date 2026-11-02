@@ -24,6 +24,11 @@ function it.generateUUID()
         return string.format('%x', v)
     end)
 end
+--- Coluna TINYINT(1) do banco: o oxmysql devolve true/false, mas linha antiga ou outro driver pode dar 1/0
+function it.dbBool(value)
+    return value == true or tonumber(value) == 1
+end
+
 -- Pureza (Config.Purity): arredonda no passo configurado e limita a 0-100
 function it.roundPurity(purity)
     local step = Config.Purity.step

@@ -1,4 +1,5 @@
 local plants = {}
+local plantsReady = false -- só true depois do setupPlants (o client que pede a lista antes espera, senão recebe vazia)
 
 --- How many minutes to shave off a plant's growtime given its current fertilizer%,
 --- interpolating between the two anchor points in Config.FertilizerGrowTimeReduction
@@ -156,7 +157,7 @@ local setupPlants = function()
                 addedLight = v.addedLight or 0,
                 potId = v.potId,
                 stage = stage,
-                budsHarvested = v.budsHarvested == 1,
+                budsHarvested = it.dbBool(v.budsHarvested),
                 purity = v.purity or Config.Purity.default,
                 fertilizerLog = v.fertilizerLog and json.decode(v.fertilizerLog) or {}
             }
@@ -200,6 +201,7 @@ updatePlantNeeds = function ()
     -- por planta (evita disparar vários resyncs de zona seguidos se várias plantas crescerem de
     -- estágio no mesmo tick).
     local anyStageChanged = false
+    local changes = {} -- { entidade, estágio novo }: plantas cujo prop sumiu ou mudou de estágio
 
     for k, v in pairs(plants) do
         local fertilizer = v.fertilizer
@@ -250,31 +252,27 @@ updatePlantNeeds = function ()
             })
         end
 
+        local stage = calcStage(v.growth or 0)
+        if not DoesEntityExist(k) or stage ~= v.stage then changes[#changes + 1] = { k, stage } end
+    end
+
+    -- Recria/troca o prop DEPOIS do loop: mexer na tabela plants dentro do pairs pode pular ou repetir planta
+    for _, c in ipairs(changes) do
+        local k, stage = c[1], c[2]
+        local v = plants[k]
         if not DoesEntityExist(k) then
             lib.print.info('Plant ID: '.. v.id ..' does not exist, respawning it coords:', v.coords.x)
-            -- Respawn the plant
-            local modelHash = Config.PlantTypes[Config.Plants[v.type].plantType][v.stage][1]
-            local plant = CreateObjectNoOffset(modelHash, v.coords.x, v.coords.y, v.coords.z + Config.PlantTypes[Config.Plants[v.type].plantType][v.stage][2], true, true, false)
+            local plantType = Config.Plants[v.type].plantType
+            -- getGroundOffset: no vaso a planta fica na altura do vaso (o offset do PlantTypes é pra plantar no chão)
+            local plant = CreateObjectNoOffset(Config.PlantTypes[plantType][stage][1], v.coords.x, v.coords.y, v.coords.z + getGroundOffset(plantType, stage, v.potId), true, true, false)
             FreezeEntityPosition(plant, true)
-            plants[plant] = plants[k]
-            plants[plant].entity = plant
-            plants[k] = nil
-            v = plants[plant]
-
-            local stage = calcStage(v.growth or 0)
-            if stage ~= v.stage then
-                plants[plant].stage = stage
-                updatePlantProp(plant, stage)
-                anyStageChanged = true
-            end
+            plants[plant], plants[k] = v, nil
+            v.entity, v.stage = plant, stage
         else
-            local stage = calcStage(v.growth or 0)
-            if stage ~= v.stage then
-                plants[k].stage = stage
-                updatePlantProp(k, stage)
-                anyStageChanged = true
-            end
+            plants[k].stage = stage
+            updatePlantProp(k, stage)
         end
+        anyStageChanged = true
     end
 
     -- Sem isso, o alvo da planta (client/cl_plant_targets.lua) nunca sabia que a planta cresceu
@@ -309,6 +307,7 @@ AddEventHandler('onResourceStart', function(resource)
             end
         end
     end
+    plantsReady = true
     TriggerClientEvent('it-drugs:client:syncPlantList', -1)
     SendToWebhook(0, 'message', nil, 'Started '..GetCurrentResourceName()..' logger')
 
@@ -420,16 +419,17 @@ local giveProducts = function(src, plant, mult)
     end
 end
 
--- Pureza da semente que volta na colheita: herda a da mãe, ganha conforme o cuidado (saúde +
--- fertilizante na hora de colher) ou perde se a planta estava mal cuidada
+-- Pureza da semente que volta na colheita: herda a da mãe e sobe conforme o cuidado = o PIOR entre
+-- água, adubo e saúde na hora de colher (Config.Purity.gains); abaixo da última faixa não sobe
 local nextSeedPurity = function(plant)
     local p = Config.Purity
     local purity = plant.purity or p.default
-    if plant.health < p.lossHealth then
-        return it.roundPurity(purity - math.random(p.lossMin, p.lossMax))
+    local care = math.min(plant.water or 0, plant.fertilizer or 0, plant.health or 0)
+    for _, g in ipairs(p.gains) do
+        if care >= g[1] then return it.roundPurity(purity + g[2]) end
     end
-    local care = (plant.health + (plant.fertilizer or 0)) / 200
-    return it.roundPurity(purity + p.gainMin + (p.gainMax - p.gainMin) * care)
+    if p.loss and care < p.loss[1] then return it.roundPurity(purity - p.loss[2]) end
+    return it.roundPurity(purity)
 end
 
 -- Genética nova (Config.Mutations): semente 100% pura + combinação EXATA de fertilizantes
@@ -985,6 +985,8 @@ lib.callback.register('it-drugs:server:getPlantsOwned', function(source)
 end)
 
 lib.callback.register('it-drugs:server:getPlants', function(source)
+    -- logo depois do restart o client pede antes das plantas carregarem do banco (e pode perder o syncPlantList)
+    while not plantsReady do Wait(200) end
     return plants
 end)
 

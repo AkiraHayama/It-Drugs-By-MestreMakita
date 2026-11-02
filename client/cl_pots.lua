@@ -178,6 +178,10 @@ end)
 
 RegisterNetEvent('it-drugs:client:takePot', function(args)
     local entity = args.entity
+    if args.hasSoil then -- com terra nem começa a animação (o servidor também recusa)
+        ShowNotification(nil, _U('NOTIFICATION__POT__REMOVE__SOIL__FIRST'), 'error')
+        return
+    end
 
     local ped = PlayerPedId()
     TaskTurnPedToFaceEntity(ped, entity, 1.0)

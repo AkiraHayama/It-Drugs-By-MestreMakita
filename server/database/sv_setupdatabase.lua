@@ -165,5 +165,9 @@ CreateThread(function()
     while not setupDatabase() do
         Wait(100)
     end
+    -- antes de qualquer prop nascer do banco: some com os que sobraram no mapa (fantasma de restart,
+    -- que não estava mais em nenhuma tabela e ficava parado sem menu)
+    local n = ClearDrugProps()
+    if n > 0 then lib.print.info(('%d props do it-drugs sem dono apagados antes de carregar o banco'):format(n)) end
     DatabaseSetuped = true
 end)

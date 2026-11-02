@@ -214,19 +214,24 @@ local function spawnScaled(model, pos, heading, size)
     return obj
 end
 
--- cubinhos em volta do primeiro (metros); o primeiro é o que o mouse pega
-local CUBE_OFFSETS = {
-    vector3(0.0, 0.0, 0.0), vector3(0.055, 0.01, 0.0), vector3(-0.05, 0.03, 0.0),
-    vector3(0.02, -0.05, 0.0), vector3(0.065, -0.045, 0.0), vector3(-0.02, -0.01, 0.04),
+-- 4 jeitos de espalhar os cubinhos em volta do primeiro (metros, todos no tampo, sem um em cima do outro); o
+-- primeiro é o que o mouse pega. Cada pilha usa um conforme o lugar dela, então espaços vizinhos ficam diferentes.
+local CUBE_PATTERNS = {
+    { vector3(0.0, 0.0, 0.0), vector3(0.075, 0.02, 0.0), vector3(-0.07, 0.025, 0.0), vector3(0.02, -0.055, 0.0), vector3(-0.055, -0.045, 0.0), vector3(0.085, -0.055, 0.0) },
+    { vector3(0.0, 0.0, 0.0), vector3(-0.075, 0.0, 0.0), vector3(0.075, -0.01, 0.0), vector3(-0.035, 0.06, 0.0), vector3(0.04, 0.055, 0.0), vector3(0.0, -0.065, 0.0) },
+    { vector3(0.0, 0.0, 0.0), vector3(0.07, 0.045, 0.0), vector3(-0.07, -0.04, 0.0), vector3(0.07, -0.04, 0.0), vector3(-0.07, 0.045, 0.0), vector3(0.0, 0.065, 0.0) },
+    { vector3(0.0, 0.0, 0.0), vector3(-0.08, -0.02, 0.0), vector3(0.06, 0.05, 0.0), vector3(0.08, -0.03, 0.0), vector3(-0.03, -0.06, 0.0), vector3(-0.05, 0.055, 0.0) },
 }
+local CUBE_OFFSETS = CUBE_PATTERNS[1] -- só pra contar quantos cubinhos tem uma pilha
 local function spawnCubes(pos, heading, n, model, size) -- model/size: pilha de outra coisa (buds do camarão)
     model, size = model or bench.props.cube, size or bench.cubeSize
     local main = spawnScaled(model, pos, heading, size)
     if not main then return end
-    local list = {}
-    for i = 2, math.min(n, #CUBE_OFFSETS) do
-        local c = spawnScaled(model, pos + CUBE_OFFSETS[i], heading + i * 37.0, size)
-        if c then list[#list + 1] = { c, CUBE_OFFSETS[i] } end
+    local p = math.floor(pos.x * 37 + pos.y * 53) % #CUBE_PATTERNS + 1 -- mesmo lugar = mesmo padrão (não muda ao reabrir)
+    local offsets, list = CUBE_PATTERNS[p], {}
+    for i = 2, math.min(n, #offsets) do
+        local c = spawnScaled(model, pos + offsets[i], heading + i * 37.0 + p * 19.0, size)
+        if c then list[#list + 1] = { c, offsets[i] } end
     end
     followers[main] = list
     return main
@@ -285,6 +290,8 @@ local function clearSaved(tbl)
         for _, b in ipairs(state.grinder.buds) do deleteProp(b) end
     end
     for _, obj in pairs(state.budPiles or {}) do deleteProp(obj) end
+    for _, e in pairs(state.extra or {}) do deleteProp(e.obj) end
+    for _, e in pairs(state.budExtra or {}) do deleteProp(e.obj) end
     for _, obj in pairs(state.ctools or {}) do deleteProp(obj) end
     for _, obj in ipairs(state.creadyProps or {}) do deleteProp(obj) end
     saved[tbl] = nil
@@ -318,6 +325,75 @@ local function poseProp(obj, pos, rx, rz)
     if not obj then return end
     SetEntityRotation(obj, rx, 0.0, rz, 2, true)
     moveProp(obj, pos)
+end
+
+-- 4 jeitos de deitar as buds no espaço delas; a primeira é a que o mouse pega.
+-- { x, y, giro }: as 3 primeiras = o padrão original (x/y no mundo); as 2 últimas (lado = true) ficam à direita, em
+-- cima, com x/y no sentido da mesa (x = direita, y = fundo)
+local BUD_PATTERNS = {
+    { { 0.0, 0.0, 0.0 }, { 0.0, 0.045, 25.0 }, { 0.01, -0.045, -20.0 }, { 0.045, 0.055, -5.0, lado = true }, { 0.085, 0.03, -15.0, lado = true } },
+    { { 0.0, 0.0, 90.0 }, { -0.05, 0.0, 70.0 }, { 0.05, 0.01, 110.0 }, { 0.045, 0.055, 90.0, lado = true }, { 0.085, 0.03, 80.0, lado = true } },
+    { { 0.0, 0.0, 45.0 }, { 0.04, 0.04, 30.0 }, { -0.04, -0.035, 60.0 }, { 0.045, 0.055, 45.0, lado = true }, { 0.085, 0.03, 35.0, lado = true } },
+    { { 0.0, 0.0, -40.0 }, { -0.04, 0.04, -60.0 }, { 0.045, -0.03, -20.0 }, { 0.045, 0.055, -40.0, lado = true }, { 0.085, 0.03, -50.0, lado = true } },
+}
+local function spawnBuds(pos, heading)
+    local G = bench.grinder
+    local p = math.floor(pos.x * 37 + pos.y * 53) % #BUD_PATTERNS + 1 -- mesmo lugar = mesmo padrão
+    local h = math.rad(heading)
+    local c, s = math.cos(h), math.sin(h)
+    local main, list = nil, {}
+    for _, b in ipairs(BUD_PATTERNS[p]) do
+        local off = b.lado and vector3(b[1] * c - b[2] * s, b[1] * s + b[2] * c, 0.0) or vector3(b[1], b[2], 0.0)
+        local at = pos + off + vector3(0.0, 0.0, G.budLift)
+        local obj = spawnScaled(G.bud, at, heading, G.budSize)
+        if obj then
+            poseProp(obj, at, G.budTilt, heading + b[3])
+            if main then list[#list + 1] = { obj, at - GetEntityCoords(main) } else main = obj end
+        end
+    end
+    if main then followers[main] = list end
+    return main
+end
+
+--- Quantos espaços a variedade ocupa no estoque (cada um guarda `max`: bench.maxCubes ou bench.maxBuds; igual ao servidor)
+local function pileSlotsOf(st, max)
+    return st and math.max(tonumber(st.slots) or 1, math.ceil((tonumber(st.count) or 0) / (max or bench.maxCubes))) or 0
+end
+
+--- Os dois tipos de pilha que podem ocupar mais de um espaço: cubos (prensado) e buds (camarão)
+local PILE_KINDS = {
+    cubes = { piles = 'piles', at = 'pileAt', extra = 'extra', slots = 'pileSlots', max = 'maxCubes',
+        spawn = function(pos, heading) return spawnCubes(pos, heading, #CUBE_OFFSETS) end },
+    buds = { piles = 'budPiles', at = 'budAt', extra = 'budExtra', slots = 'budSlots', max = 'maxBuds', spawn = spawnBuds },
+}
+
+--- Pilhas extras da mesma variedade (state.extra / state.budExtra = { espaço -> { strain, obj } }): acerta com o estoque
+local function syncExtraPiles(tbl, state, stockPiles, heading, kind)
+    local K = PILE_KINDS[kind or 'cubes']
+    local piles, pileAt, extra = state[K.piles], state[K.at], state[K.extra]
+    local want = {}
+    for strain, st in pairs(stockPiles or {}) do
+        if piles[strain] then want[strain] = pileSlotsOf(st, bench[K.max]) - 1 end
+    end
+    for key, e in pairs(extra) do
+        if (want[e.strain] or 0) > 0 then
+            want[e.strain] = want[e.strain] - 1
+        else
+            deleteProp(e.obj)
+            extra[key] = nil
+        end
+    end
+    for strain, n in pairs(want) do
+        for _, key in ipairs(bench[K.slots]) do
+            if n < 1 then break end
+            local taken = extra[key] ~= nil
+            for _, k in pairs(pileAt) do taken = taken or k == key end
+            if not taken then
+                extra[key] = { strain = strain, obj = K.spawn(propPoint(tbl, key), heading) }
+                n = n - 1
+            end
+        end
+    end
 end
 
 local function spawnGrinder(tbl)
@@ -363,7 +439,7 @@ end
 local function renderLayout(tbl, layout, mode)
     clearSaved(tbl)
     mode = mode or (layout and layout.mode) or 'prensado'
-    local state = { mode = mode, tools = {}, piles = {}, pileAt = {}, wrapped = {}, budPiles = {}, budAt = {}, ctools = {}, creadyProps = {} }
+    local state = { mode = mode, tools = {}, piles = {}, pileAt = {}, extra = {}, wrapped = {}, budPiles = {}, budAt = {}, budExtra = {}, ctools = {}, creadyProps = {} }
     saved[tbl] = state
     if not layout then return end
     local heading = GetEntityHeading(tbl)
@@ -384,10 +460,11 @@ local function renderLayout(tbl, layout, mode)
         for i, strain in ipairs(list) do
             local key = bench.budSlots[i]
             if key then
-                state.budPiles[strain] = spawnCubes(propPoint(tbl, key), heading, #CUBE_OFFSETS, bench.grinder.bud, bench.grinder.budSize)
+                state.budPiles[strain] = spawnBuds(propPoint(tbl, key), heading)
                 state.budAt[strain] = key
             end
         end
+        syncExtraPiles(tbl, state, stock.buds, heading, 'buds')
         return
     end
     -- faca, balança e zip lock aparecem se estiverem no estoque da mesa
@@ -437,6 +514,7 @@ local function renderLayout(tbl, layout, mode)
         end
         ::nextPile::
     end
+    syncExtraPiles(tbl, state, stock.cubes, heading)
     for i = 1, math.min(readyCount(layout.ready), #PACK_SPOTS) do spawnWrapped(tbl, state.wrapped, i) end
 end
 
@@ -618,6 +696,21 @@ local function grinderSession(tbl, serverEntity, netId, strains)
         for strain, k in pairs(budAt) do
             if k == key then return strain end
         end
+        return state.budExtra[key] and state.budExtra[key].strain
+    end
+    --- Quantas buds naquele espaço: o primeiro enche até bench.maxBuds e o resto vai pros extras (igual aos cubos)
+    local function budsIn(strain, slot)
+        local left = budsOf(strain)
+        local order = { budAt[strain] }
+        for _, key in ipairs(bench.budSlots) do
+            if state.budExtra[key] and state.budExtra[key].strain == strain then order[#order + 1] = key end
+        end
+        for _, key in ipairs(order) do
+            local n = math.min(left, bench.maxBuds)
+            if key == slot then return n end
+            left = left - n
+        end
+        return 0
     end
     local function freeBudSlot()
         for _, key in ipairs(bench.budSlots) do
@@ -640,7 +733,8 @@ local function grinderSession(tbl, serverEntity, netId, strains)
         add(P.scaleItem, ctools.cscale ~= nil)
         add(G.bagItem, plastic() >= bench.maxPlastic)
         for _, strain in ipairs(strainList) do
-            add(curedOf(strain), budPiles[strain] and budsOf(strain) >= bench.maxBuds or (not budPiles[strain] and full))
+            local room = budPiles[strain] and budsOf(strain) < pileSlotsOf((stock().buds or {})[strain], bench.maxBuds) * bench.maxBuds
+            add(curedOf(strain), full and not room)
         end
         return list
     end
@@ -665,13 +759,15 @@ local function grinderSession(tbl, serverEntity, netId, strains)
                 budPiles[strain], budAt[strain] = nil, nil
             end
         end
+        syncExtraPiles(tbl, state, stock().buds, GetEntityHeading(tbl), 'buds') -- extras somem junto com a pilha principal
         for strain in pairs(stock().buds or {}) do -- pilha nova (voltou do dichavador, por exemplo)
             local key = not budPiles[strain] and budsOf(strain) > 0 and freeBudSlot()
             if key then
-                budPiles[strain] = spawnCubes(propPoint(tbl, key), GetEntityHeading(tbl), #CUBE_OFFSETS, G.bud, G.budSize)
+                budPiles[strain] = spawnBuds(propPoint(tbl, key), GetEntityHeading(tbl))
                 budAt[strain] = key
             end
         end
+        syncExtraPiles(tbl, state, stock().buds, GetEntityHeading(tbl), 'buds') -- e as extras da pilha nova / do espaço novo
         setReadyBags(tbl, creadyProps, cready() and cready().bags or 0)
         for key, here in pairs({ cscale = stockTool('cscale'), cbag = plastic() > 0 }) do
             if here and not ctools[key] then
@@ -712,7 +808,8 @@ local function grinderSession(tbl, serverEntity, netId, strains)
             list[#list + 1] = { kind = 'base', obj = state.grinder.base, pos = grinderAt(tbl), radius = bench.scaleRadius }
             list[#list + 1] = { kind = 'lid', obj = state.grinder.lid, radius = bench.scaleRadius }
         end
-        for strain, obj in pairs(budPiles) do list[#list + 1] = { kind = 'pile', key = strain, obj = obj, radius = bench.grabRadius } end
+        for strain, obj in pairs(budPiles) do list[#list + 1] = { kind = 'pile', key = strain, obj = obj, slot = budAt[strain], radius = bench.grabRadius } end
+        for key, e in pairs(state.budExtra) do list[#list + 1] = { kind = 'pile', key = e.strain, obj = e.obj, slot = key, radius = bench.grabRadius } end
         for key, obj in pairs(ctools) do list[#list + 1] = { kind = key, obj = obj, radius = bench.scaleRadius } end
         if creadyProps[1] then list[#list + 1] = { kind = 'cready', obj = creadyProps[1], pos = slotPoint(tbl, 'cready'), radius = bench.scaleRadius } end
         local best, bestDist
@@ -731,7 +828,7 @@ local function grinderSession(tbl, serverEntity, netId, strains)
     local function hover(g)
         local info
         if g and g.kind == 'pile' then
-            info = { label = label(curedOf(g.key)), count = budsOf(g.key) }
+            info = { label = label(curedOf(g.key)), count = budsIn(g.key, g.slot) }
         elseif g and g.kind == 'cscale' then
             info = { label = label(P.scaleItem), count = 1 }
         elseif g and g.kind == 'cbag' then
@@ -771,14 +868,14 @@ local function grinderSession(tbl, serverEntity, netId, strains)
             Wait(15)
         end
         poseProp(lid, closed, 0.0, heading)
-        setBuds(tbl, state.grinder, nil) -- fechou: não aparece mais nada dentro
+        -- fechado: a bud já vira dichavada por baixo da tampa e o servidor dichava enquanto gira (abre já pronta)
+        setBuds(tbl, state.grinder, { count = 1, ground = true })
+        TriggerServerEvent('it-drugs:server:benchGrind', serverEntity)
         local start = GetGameTimer()
         while GetGameTimer() - start < G.spinTime do -- gira a tampa
             poseProp(lid, closed, 0.0, heading + (GetGameTimer() - start) * 0.54)
             Wait(0)
         end
-        TriggerServerEvent('it-drugs:server:benchGrind', serverEntity)
-        Wait(700)
         if state.grinder then
             lid = state.grinder.lid
             for f = 0.0, 1.0, 0.05 do
@@ -844,11 +941,15 @@ local function grinderSession(tbl, serverEntity, netId, strains)
         end
         local other = budIn(at)
         if other and other ~= strain then return ShowNotification(nil, _U('NOTIFICATION__BENCH__PILE__BUSY'), 'error') end
+        local newSlot = false
         if not budPiles[strain] then
-            budPiles[strain] = spawnCubes(propPoint(tbl, at), heading, #CUBE_OFFSETS, G.bud, G.budSize)
+            budPiles[strain] = spawnBuds(propPoint(tbl, at), heading)
             budAt[strain] = at
+        elseif not other then -- mesma variedade num espaço vazio: ganha mais um espaço (o servidor confirma)
+            state.budExtra[at] = { strain = strain, obj = spawnBuds(propPoint(tbl, at), heading) }
+            newSlot = true
         end
-        TriggerServerEvent('it-drugs:server:benchStock', serverEntity, 'buds', strain) -- sai do inventário (até o limite)
+        TriggerServerEvent('it-drugs:server:benchStock', serverEntity, 'buds', strain, newSlot) -- sai do inventário (até o limite)
         afterServer()
     end
 
@@ -906,6 +1007,7 @@ local function grinderSession(tbl, serverEntity, netId, strains)
             if g.kind == 'pile' then -- pega uma bud da pilha
                 if not state.grinder then return ShowNotification(nil, _U('NOTIFICATION__BENCH__NEED__GRINDER'), 'error') end
                 local obj = spawnScaled(G.bud, GetEntityCoords(g.obj), heading, G.budSize)
+                poseProp(obj, GetEntityCoords(g.obj), G.budTilt, heading) -- deitada, igual na pilha
                 if obj then drag = { key = g.key, obj = obj } end
             elseif g.kind == 'cbag' then -- pega um zip lock pra levar até o dichavador
                 local obj = spawnProp(G.bagProp, GetEntityCoords(g.obj), heading)
@@ -1048,6 +1150,7 @@ RegisterNetEvent('it-drugs:client:bench', function(args)
         for strain, k in pairs(pileAt) do
             if k == key then return strain end
         end
+        return state.extra[key] and state.extra[key].strain
     end
     local function freePile()
         for _, key in ipairs(bench.pileSlots) do
@@ -1057,6 +1160,12 @@ RegisterNetEvent('it-drugs:client:bench', function(args)
     local function removePile(strain)
         deleteProp(piles[strain])
         piles[strain], pileAt[strain] = nil, nil
+        for key, e in pairs(state.extra) do
+            if e.strain == strain then
+                deleteProp(e.obj)
+                state.extra[key] = nil
+            end
+        end
     end
 
     -- estoque da mesa (vem do servidor): cubos e zip lock que estão na mesa NÃO estão mais no inventário
@@ -1064,6 +1173,21 @@ RegisterNetEvent('it-drugs:client:bench', function(args)
     local function stockCubes(strain)
         local c = (stock().cubes or {})[strain]
         return c and tonumber(c.count) or 0
+    end
+    --- Quantos cubos tem naquele espaço: o estoque é um total por variedade, então o primeiro espaço enche até
+    --- bench.maxCubes e o resto vai pros extras na ordem dos espaços
+    local function pileCount(strain, slot)
+        local left = stockCubes(strain)
+        local order = { pileAt[strain] }
+        for _, key in ipairs(bench.pileSlots) do
+            if state.extra[key] and state.extra[key].strain == strain then order[#order + 1] = key end
+        end
+        for _, key in ipairs(order) do
+            local n = math.min(left, bench.maxCubes)
+            if key == slot then return n end
+            left = left - n
+        end
+        return 0
     end
     local function stockFilm() return tonumber(stock().film) or 0 end
     local function oldFilm() return stockFilm() > 0 and (stock().filmItem or 'plastico_filme') ~= P.filmItem end -- outro item no espaço do filme
@@ -1086,7 +1210,8 @@ RegisterNetEvent('it-drugs:client:bench', function(args)
         local full = freePile() == nil
         for _, strain in ipairs(strainList) do
             add('tijolo_' .. strain, center ~= nil)
-            add(cubeOf(strain), piles[strain] and stockCubes(strain) >= bench.maxCubes or (not piles[strain] and full))
+            local room = piles[strain] and stockCubes(strain) < pileSlotsOf((stock().cubes or {})[strain]) * bench.maxCubes
+            add(cubeOf(strain), full and not room)
         end
         return list
     end
@@ -1113,8 +1238,11 @@ RegisterNetEvent('it-drugs:client:bench', function(args)
     --- O que está na mesa: { kind, key, obj, pos }
     local function grabbables()
         local list = {}
-        for key, obj in pairs(tools) do list[#list + 1] = { kind = key, obj = obj } end
-        for strain, obj in pairs(piles) do list[#list + 1] = { kind = 'pile', key = strain, obj = obj } end
+        for key, obj in pairs(tools) do -- faca: a origem do modelo fica fora do meio, então o alvo é o meio do espaço dela
+            list[#list + 1] = { kind = key, obj = obj, pos = key == 'knife' and slotPoint(tbl, 'knife') or nil }
+        end
+        for strain, obj in pairs(piles) do list[#list + 1] = { kind = 'pile', key = strain, obj = obj, slot = pileAt[strain] } end
+        for key, e in pairs(state.extra) do list[#list + 1] = { kind = 'pile', key = e.strain, obj = e.obj, slot = key } end
         if center then
             local obj = center.obj or center.cubes[1].obj
             list[#list + 1] = { kind = 'center', obj = obj, pos = slotPoint(tbl, 'center') }
@@ -1126,7 +1254,7 @@ RegisterNetEvent('it-drugs:client:bench', function(args)
         local best, bestDist
         for _, g in ipairs(grabbables()) do
             local dist = screenDist(g.pos or GetEntityCoords(g.obj), sx, sy)
-            local radius = (g.kind == 'scale' or g.kind == 'center' or g.kind == 'wrapped') and bench.scaleRadius or bench.grabRadius
+            local radius = (g.kind == 'scale' or g.kind == 'knife' or g.kind == 'center' or g.kind == 'wrapped') and bench.scaleRadius or bench.grabRadius
             if dist < radius and (not bestDist or dist < bestDist) then best, bestDist = g, dist end
         end
         return best
@@ -1185,6 +1313,7 @@ RegisterNetEvent('it-drugs:client:bench', function(args)
         for strain in pairs(piles) do
             if stockCubes(strain) < 1 then removePile(strain) end
         end
+        syncExtraPiles(tbl, state, stock().cubes, heading)
         if tools.film and stockFilm() < 1 then
             deleteProp(tools.film)
             tools.film = nil
@@ -1252,13 +1381,15 @@ RegisterNetEvent('it-drugs:client:bench', function(args)
         local knife, cube = tools.knife, cubeOf(center.strain)
         local top = at.z + bench.knifeLift
         standKnife()
-        for _ = 1, 3 do -- faca sobe e desce em cima do tijolo
+        for _, d in ipairs(bench.cutSpots) do -- um corte (desce e sobe) em cada posição do tijolo, andando pro lado
+            local p = slotPoint(tbl, 'center', d, bench.knifeShift)
+            local x, y = p.x, p.y
             for f = 0.0, 1.0, 0.1 do
-                SetEntityCoords(knife, at.x, at.y, top + 0.08 - f * 0.12, false, false, false, false)
+                SetEntityCoords(knife, x, y, top + 0.08 - f * 0.12, false, false, false, false)
                 Wait(15)
             end
             for f = 0.0, 1.0, 0.2 do
-                SetEntityCoords(knife, at.x, at.y, top - 0.04 + f * 0.12, false, false, false, false)
+                SetEntityCoords(knife, x, y, top - 0.04 + f * 0.12, false, false, false, false)
                 Wait(15)
             end
         end
@@ -1320,11 +1451,15 @@ RegisterNetEvent('it-drugs:client:bench', function(args)
             if not strains[strain] then return end
             local other = pileIn(at)
             if other and other ~= strain then return ShowNotification(nil, _U('NOTIFICATION__BENCH__PILE__BUSY'), 'error') end
+            local newSlot = false
             if not piles[strain] then
                 piles[strain] = spawnCubes(propPoint(tbl, at), heading, #CUBE_OFFSETS)
                 pileAt[strain] = at
+            elseif not other then -- mesma variedade num espaço vazio: ganha mais um espaço (o servidor confirma)
+                state.extra[at] = { strain = strain, obj = spawnCubes(propPoint(tbl, at), heading, #CUBE_OFFSETS) }
+                newSlot = true
             end
-            TriggerServerEvent('it-drugs:server:benchStock', serverEntity, 'cube', strain) -- sai do inventário (até o limite)
+            TriggerServerEvent('it-drugs:server:benchStock', serverEntity, 'cube', strain, newSlot) -- sai do inventário (até o limite)
             return afterServer()
         end
         if key == 'film' then
@@ -1377,7 +1512,7 @@ RegisterNetEvent('it-drugs:client:bench', function(args)
                 end
             else
                 local item = (g.kind == 'knife' and P.knifeItem) or (g.kind == 'scale' and P.scaleItem) or (g.kind == 'film' and (oldFilm() and stock().filmItem or P.filmItem)) or cubeOf(g.key)
-                local n = (g.kind == 'film' and stockFilm()) or (g.kind == 'pile' and stockCubes(g.key)) or (stockTool(g.kind) and 1) or 0
+                local n = (g.kind == 'film' and stockFilm()) or (g.kind == 'pile' and pileCount(g.key, g.slot)) or (stockTool(g.kind) and 1) or 0
                 info = { label = label(item), count = n }
             end
         end
@@ -1447,6 +1582,7 @@ RegisterNetEvent('it-drugs:client:bench', function(args)
             moveProp(center.obj, propPoint(tbl, key))
             center = nil
         end
+        syncExtraPiles(tbl, state, stock().cubes, heading) -- passou de bench.maxCubes: a variedade ocupa mais um espaço
         return true -- os cubos cortados já estão no estoque da mesa (benchCut): aqui é só onde a pilha fica
     end
 

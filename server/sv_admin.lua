@@ -92,3 +92,38 @@ end
 lib.callback.register('it-drugs:server:isAdmin', function(source)
     return IsPlayerAceAllowed(source, 'admin')
 end)
+-- /limparpropsdrogas: apaga do mapa TODO objeto com modelo do it-drugs (vaso, planta, mesa, secador, lâmpada,
+-- ventilador, gerador). Serve pra sumir com prop bugado que ficou sem estar no banco; os que estão no banco
+-- voltam no próximo `restart it-drugs`. Só admin (ou console).
+local function drugModels()
+    local list = {}
+    local function add(name) if type(name) == 'string' then list[joaat(name)] = true end end
+    for _, groups in ipairs({ Config.Lamps, Config.Pots, Config.DryingRacks, Config.Fans, Config.Generators, Config.ProcessingTables }) do
+        for _, v in pairs(groups or {}) do add(v.model); add(v.soilModel) end
+    end
+    for _, stages in pairs(Config.PlantTypes or {}) do
+        for _, s in pairs(stages) do add(s[1]) end
+    end
+    add(Config.HarvestMinigame and Config.HarvestMinigame.prop) -- brotos do minigame que ficaram se ele travou
+    return list
+end
+
+--- Apaga do mapa todo objeto com modelo do it-drugs; devolve quantos. Também roda sozinho no start
+--- (sv_setupdatabase.lua), antes dos props do banco nascerem.
+function ClearDrugProps()
+    local models, n = drugModels(), 0
+    for _, obj in ipairs(GetAllObjects()) do
+        if models[GetEntityModel(obj)] and DoesEntityExist(obj) then
+            DeleteEntity(obj)
+            n = n + 1
+        end
+    end
+    return n
+end
+
+RegisterCommand('limparpropsdrogas', function(source)
+    if source ~= 0 and not IsPlayerAceAllowed(source, 'admin') then return end
+    local n = ClearDrugProps()
+    print(('[it-drugs] /limparpropsdrogas: %d props apagados'):format(n))
+    if source ~= 0 then ShowNotification(source, ('%d props do it-drugs apagados do mapa'):format(n), 'success') end
+end, false)

@@ -9,7 +9,7 @@ local setupPots = function()
     for k, v in pairs(result) do
         local potConfig = Config.Pots[v.item]
         if potConfig then
-            local hasSoil = v.hasSoil == 1
+            local hasSoil = it.dbBool(v.hasSoil)
             local model = (hasSoil and potConfig.soilModel) or potConfig.model
             local modelHash = GetHashKey(model)
             local coords = json.decode(v.coords)
@@ -25,8 +25,8 @@ local setupPots = function()
                 rot = v.rotation + .0,
                 entity = pot,
                 hasSoil = hasSoil,
-                needsFertilizer = v.soilNeedsFertilizer == 1, -- planta cortada: precisa adubar antes de plantar de novo
-                burnt = v.soilBurnt == 1, -- planta queimada: terra imprópria, tem que remover e pôr terra nova
+                needsFertilizer = it.dbBool(v.soilNeedsFertilizer), -- planta cortada: precisa adubar antes de plantar de novo
+                burnt = it.dbBool(v.soilBurnt), -- planta queimada: terra imprópria, tem que remover e pôr terra nova
             }
         end
     end

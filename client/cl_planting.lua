@@ -338,13 +338,17 @@ local runHarvestMinigame = function(plantCoords, type, fertilizer, purity)
     local orbitAngle = math.atan(camAngleDir.y, camAngleDir.x)
 
     local buds = {}
+    -- sorteio com semente = lugar da planta: a mesma planta sempre mostra os brotos no mesmo lugar (sair e voltar não muda)
+    math.randomseed(math.floor(plantCoords.x * 100) * 7919 + math.floor(plantCoords.y * 100) * 104729 + math.floor(plantCoords.z * 100))
     for i = 1, budCount do
         -- Círculo 360° completo em volta da planta de novo (era um arco de ±80° voltado pra
         -- câmera) - agora que dá pra girar a câmera com A/D, não precisa mais esconder os brotos
         -- do lado de trás, o jogador gira até eles.
         local angle = math.random() * 2 * math.pi
-        local radius = math.random() * mgConfig.spawnRadius
         local height = mgConfig.minHeight + math.random() * (mgConfig.maxHeight - mgConfig.minHeight)
+        -- a copa afina pra cima: no topo o raio cai pra (1 - spawnTaper) do de baixo, pra não nascer fora da planta
+        local up = (height - mgConfig.minHeight) / math.max(mgConfig.maxHeight - mgConfig.minHeight, 0.01)
+        local radius = math.random() * mgConfig.spawnRadius * (1.0 - (mgConfig.spawnTaper or 0.0) * up)
         local bud = CreateObject(hashModel, plantCoords.x + math.cos(angle) * radius, plantCoords.y + math.sin(angle) * radius, plantCoords.z + height, true, true, false)
         SetEntityCollision(bud, false, false)
         FreezeEntityPosition(bud, true)
@@ -352,6 +356,7 @@ local runHarvestMinigame = function(plantCoords, type, fertilizer, purity)
         SetEntityDrawOutline(bud, true)
         table.insert(buds, bud)
     end
+    math.randomseed() -- volta o sorteio normal pro resto do script
 
     local outline = mgConfig.outlineColor
     SetEntityDrawOutlineColor(outline[1], outline[2], outline[3], outline[4])
@@ -584,7 +589,7 @@ local giveWater = function(args)
 
     local ped = PlayerPedId()
     local coords = GetEntityCoords(ped)
-    local model = 'prop_wateringcan'
+    local model = Config.Items[item].prop or 'prop_wateringcan'
     TaskTurnPedToFaceEntity(ped, entity, 1.0)
     Wait(200)
     RequestModel(model)

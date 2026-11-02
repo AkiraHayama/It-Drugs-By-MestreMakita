@@ -64,7 +64,7 @@ Config.PlaceMaxDistance = 3.0
 -- Ferramenta pra plantar direto no CHÃO (cavucar); no vaso não precisa. Não é gasta. false = não exige.
 Config.PlantTool = 'pa_jardim'
 Config.FireTime = 10000 -- in ms
-Config.ClearOnStartup = true -- Clear dead plants on script start-up
+Config.ClearOnStartup = false -- true = apaga planta morta ao ligar o it-drugs; false (pedido do usuário 31/10/2026): restart não muda nada, a morta fica até destruir pelo menu
 Config.PlayerPlantLimit = 10 -- Max amount of plants a player can have simultaneously
 
 --[[
@@ -79,7 +79,8 @@ Config.PlayerPlantLimit = 10 -- Max amount of plants a player can have simultane
 ]]
 Config.HarvestMinigame = {
     prop = 'bkr_prop_weed_bud_02a', -- broto solto, confirmado em mri_Qadmin/data/object.lua (mesmo usado no estágio da small_plant)
-    spawnRadius = 0.6, -- raio (metros) em volta da planta onde os brotos aparecem espalhados - reduzido (era 1.0) pra não nascer fora da copa
+    spawnRadius = 0.35, -- raio (metros) em volta do caule onde os brotos aparecem (era 0.6: nasciam fora da copa)
+    spawnTaper = 0.5, -- a copa afina pra cima: no topo o raio é (1 - spawnTaper) x spawnRadius
     budScale = 0.55, -- escala visual do broto (1.0 = tamanho normal do model) - não existe native de escala pronta, aplicado na mão via matriz do entity (ver scaleBud em client/cl_planting.lua)
     -- Colheita só libera com a planta 100% crescida, que é SEMPRE o estágio 3 (grande) - bem mais
     -- alta que o estágio 1/2. minHeight/maxHeight definem a faixa de altura (metros acima da base
@@ -140,7 +141,8 @@ Config.IndoorSunlightThreshold = 40
 -- margem de erro de onde exatamente o raio bate no vaso.
 Config.PlantTargetZone = {
     radius = 1.0, -- raio (metros) da esfera de detecção - grande de propósito, ver comentário acima
-    heightOffset = 0.15, -- pequeno, só pra não ficar exatamente na base/solo do vaso - ajuste fino se precisar
+    heightOffset = 0.5, -- metros acima da base: o "checar planta" fica no meio da folhagem, não no pé
+    heightByStage = { [1] = 0, [2] = 0.2, [3] = 0.4 }, -- somado no heightOffset: planta maior, alvo mais alto
     distance = 1.5, -- distância máxima (metros) do jogador até a zona pra opção aparecer
 
     -- Planta estágio 3 (grande/pronta) é bem mais alta e larga que estágio 1 (pequena) - o
@@ -411,10 +413,16 @@ Config.LampLightRampStep = 20
 
 Config.Items = {
     ['watering_can'] = {
-        water = 25,
+        water = 50,
         fertilizer = 0,
         itemBack = nil, -- ignorado quando charges = true (o item nunca é removido, então nunca precisa devolver)
         charges = true, -- item de cargas limitadas: não é consumido por uso, só perde 1 carga (metadata do ox_inventory) até zerar. Precisa reabastecer num Config.WaterPoints pra voltar a Config.WateringCanMaxCharges.
+    },
+    ['water_bottle'] = { -- Garrafa de Água (item do MRI): gasta 1 e devolve a garrafa vazia
+        water = 15,
+        fertilizer = 0,
+        itemBack = 'empty_water_bottle',
+        prop = 'prop_ld_flow_bottle', -- o que o boneco segura regando (sem prop = regador)
     },
     ['liquid_fertilizer'] = {
         water = 15,
@@ -648,22 +656,23 @@ Config.Plants = { -- Create seeds for drugs
     -> seca (secador) -> dichavada -> saquinho (mesa). Semente sem pureza (admin, antiga) conta
     como Config.Purity.default.
 
-    Na colheita, a semente que volta herda a pureza da mãe: planta bem cuidada ganha
-    gainMin..gainMax (escala com saúde + fertilizante na hora de colher), planta com saúde abaixo
-    de lossHealth perde lossMin..lossMax. Pureza também multiplica quantos brotos a planta dá
+    Na colheita, a semente que volta herda a pureza da mãe e sobe conforme o cuidado: vale o PIOR
+    entre água, adubo e saúde da planta na hora de colher (gains: 100% -> +3, 80% -> +2, 50% -> +1,
+    abaixo de 50% não sobe; nunca desce). Pureza também multiplica quantos brotos a planta dá
     (yieldAtZero em 0% até 1.0 em 100%) e o preço do saquinho pro NPC (priceAtZero até 1.0).
 ]]
 Config.Purity = {
-    default = 10, -- semente sem metadata de pureza (e a do dealer)
-    step = 5, -- pureza arredonda de 5 em 5 pra não picar o inventário em dezenas de pilhas
-    gainMin = 5,
-    gainMax = 20,
-    lossHealth = 50,
-    lossMin = 5,
-    lossMax = 10,
+    default = 0, -- semente sem metadata de pureza (e a do dealer): começa do zero
+    step = 1, -- pureza anda de 1 em 1 (sobe só +1/+2/+3 por colheita)
+    gains = { -- { cuidado mínimo (%), quanto a semente sobe }, do maior pro menor
+        { 100, 3 },
+        { 80, 2 },
+        { 50, 1 },
+    },
+    loss = { 40, 1 }, -- cuidado abaixo de 40%: a semente PERDE 1 (entre 40 e 50% fica igual)
     yieldAtZero = 0.5,
     priceAtZero = 0.4,
-    mutationPurity = 10, -- pureza da semente de genética nova que sai da mistura
+    mutationPurity = 0, -- pureza da semente de genética nova que sai da mistura
 }
 
 -- Variedades de maconha: gera as receitas de dichavar/ensacar (Config.ProcessingTables) e a venda
@@ -904,9 +913,9 @@ Config.Prensado = {
     pressTime = 15, -- segundos prensando
     -- emote "mexer" do mri_Qemotes (mexendo no parquímetro, mão calma). walkTo = o boneco anda até a prensa antes de começar
     pressAnimation = { dict = 'amb@prop_human_parking_meter@female@idle_a', anim = 'idle_a_female', walkTo = true },
-    cubesPerBrick = 45, -- 1 tijolo cortado
+    cubesPerBrick = 50, -- 1 tijolo cortado
     cubesPerWrap = 10, -- cubos embalados de uma vez (cada arrasto pra balança), gastando 1 zip lock por cubo
-    -- preço do cubo embalado = 40% do saquinho POR QUANTIDADE DE ERVA (tijolo = 30 secas -> 45 cubos;
+    -- preço do cubo embalado = 40% do saquinho POR QUANTIDADE DE ERVA (tijolo = 30 secas -> 50 cubos;
     -- saquinho = 5 curadas): Lemon Haze ~$8, Rainbow Belts ~$21 (x pureza). Prensado rende menos que a curada.
     priceFactor = 0.4,
 }
@@ -933,7 +942,7 @@ Config.Bench = {
     -- prop = deslocamento do prop dentro do espaço (metros), pra modelo com a origem fora do meio. Cada item só entra no seu.
     slots = {
         center = { label = 'Fabricação', along = 0.00, across = -0.02, w = 0.34, d = 0.26, color = { 90, 255, 150 } },
-        knife = { label = 'Faca', along = -0.30, across = -0.02, w = 0.11, d = 0.32, color = { 255, 95, 95 }, prop = { 0.0, 0.12 } },
+        knife = { label = 'Faca', along = -0.30, across = -0.02, w = 0.11, d = 0.32, color = { 255, 95, 95 }, prop = { 0.0, -0.12 } },
         -- espaços de cubos (pile = true): um por variedade; dá pra pesar de vários e misturar no meio
         pile1 = { label = 'Cubos', pile = true, along = -0.54, across = 0.25, w = 0.22, d = 0.18, color = { 255, 190, 70 } },
         pile2 = { label = 'Cubos', pile = true, along = -0.54, across = 0.00, w = 0.22, d = 0.18, color = { 255, 190, 70 } },
@@ -959,6 +968,8 @@ Config.Bench = {
         lid = 'mri_dichavador_tampa',
         bud = 'bkr_prop_weed_bud_01a', -- bud curada dentro dele (encolhida até budSize)
         budSize = 0.17, -- metros: maior lado de cada bud na mesa e no dichavador
+        budTilt = 90.0, -- graus: buds deitadas no espaço Buds e ao arrastar (0 = em pé)
+        budLift = 0.02, -- metros: sobe as buds deitadas pra não afundarem no tampo
         capacity = 1, -- buds por vez no dichavador: 1 bud = 1 dichavada = 1 saquinho
         ground = 'h4_prop_h4_weed_dry_01a', -- a dichavada dentro do dichavador / indo pra balança (encolhida até groundSize)
         groundSize = 0.12,
@@ -974,7 +985,7 @@ Config.Bench = {
     maxBuds = 50, -- camarão: buds curadas por espaço (por variedade) na mesa
     maxPlastic = 50, -- camarão: saquinhos plásticos na mesa
     -- estoque da mesa: cubos e zip lock soltos nela SAEM do inventário (botão direito devolve)
-    maxCubes = 85, -- cubos por espaço (por variedade)
+    maxCubes = 100, -- cubos por espaço (por variedade)
     maxFilm = 20, -- rolos de plástico filme na mesa
     props = { -- prop de cada coisa arrastada pra mesa
         knife = 'prop_w_me_knife_01',
@@ -985,9 +996,11 @@ Config.Bench = {
         wrapped = 'ba_prop_battle_weed_bigbag_01a', -- os 10 cubos embalados no filme (Prontos), encolhido até wrappedSize
     },
     -- giro da faca (x, y, z em graus). O modelo prop_w_me_knife_01 já vem em pé: 0,0,0 = em pé (cortando)
-    knifeFlat = vector3(90.0, 0.0, 0.0), -- deitada na mesa; se ficar de lado errado, troca pra vector3(0.0, 90.0, 0.0) ou -90
-    knifeUp = vector3(0.0, 0.0, 0.0), -- em pé na hora de cortar
-    knifeLift = 0.15, -- metros: altura da faca em pé acima do tijolo na hora de cortar
+    knifeFlat = vector3(90.0, 0.0, 180.0), -- deitada na mesa com a ponta pro fundo (o z gira ela em cima da mesa)
+    knifeUp = vector3(0.0, 90.0, 90.0), -- na hora de cortar: deitada com o fio pra baixo, atravessada na mesa (o z gira a faca em cima da mesa)
+    knifeLift = 0.06, -- metros: altura da faca acima do tijolo na hora de cortar
+    cutSpots = { -0.09, -0.054, -0.018, 0.018, 0.054, 0.09 }, -- metros: os 6 cortes, distância do meio do tijolo (pros lados da mesa)
+    knifeShift = -0.16, -- metros: a origem da faca é no cabo; puxa ela pra frente da mesa pra lâmina ficar em cima do tijolo (mais negativo = mais pra frente)
     wrappedSize = 0.12, -- metros: saquinho pronto no Produto pronto (camarão)
     packSize = 0.045, -- metros: cada cubo embalado no plástico filme (prensado), um pacotinho por cubo
     cubeSize = 0.05, -- metros: maior lado de cada cubinho (pilha = 6 cubinhos, na balança = 3)
